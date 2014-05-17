@@ -27,7 +27,7 @@ main.x:    main.o  $(OBJ)
 	$(FOR) -o main.x $(OBJ) $(FFLAGS) main.o $(LIBS)
 
 main.o:       main.cu $(OBJ) 
-	$(NVCC) -c main.cu $(NVCCFLAGS) $(INC)
+	$(NVCC) -c main.cu $(NVCCFLAGS)  -Xcompiler -fopenmp $(INC)
 
 trove_functions.o: trove_functions.cpp Util.o
 	$(FOR) -c trove_functions.cpp $(FFLAGS)
@@ -43,7 +43,7 @@ dipole_kernals.o:  dipole_kernals.cu
 	$(NVCC) -c dipole_kernals.cu $(NVCCFLAGS)
 
 cuda_host.o:  cuda_host.cu
-	$(NVCC) -c cuda_host.cu $(NVCCFLAGS)
+	$(NVCC) -c cuda_host.cu $(NVCCFLAGS) -Xcompiler -fopenmp
 #input.o:  input.f90
 #       $(FOR) -c input.f90 $(FFLAGS)
 

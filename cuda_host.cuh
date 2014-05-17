@@ -15,4 +15,6 @@ void dipole_initialise(FintensityJob* intensity);
 void dipole_do_intensities(FintensityJob & intensity);
 void dipole_do_intensities_async(FintensityJob & intensity,int device_id);
 void get_cuda_info(FintensityJob & intensity);
+void dipole_initialise_cpu(FintensityJob* intensity);
+void dipole_do_intensities_async_omp(FintensityJob & intensity,int device_id,int num_devices);
 #endif
