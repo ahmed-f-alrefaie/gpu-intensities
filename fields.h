@@ -13,7 +13,7 @@ struct Fmole_type{
 	int sym_nrepres;
 	int* sym_degen;
 	int sym_maxdegen;
-	char** csym;
+	char** c_sym;
 };	//Intensity job information
 
 struct FGPU_ptrs{

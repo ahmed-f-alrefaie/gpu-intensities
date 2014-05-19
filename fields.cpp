@@ -31,6 +31,15 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 		intensity->isym_pairs = new int[4];
 		intensity->igamma_pair = new int[4];
 		intensity->molec.nclasses = 1;
+
+		intensity->molec.c_sym = new char*[4];
+		for(int i = 0; i < 4; i++)
+			intensity->molec.c_sym[i] = new char[10];
+		strcpy(intensity->molec.c_sym[0],"A1");
+		strcpy(intensity->molec.c_sym[1],"A2");
+		strcpy(intensity->molec.c_sym[2],"B1");
+		strcpy(intensity->molec.c_sym[3],"B2");
+
 	}else{
 		printf("Symmetry not implemeted\n");
 		exit(0);

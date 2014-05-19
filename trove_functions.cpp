@@ -955,7 +955,7 @@ void read_eigenvalues(FintensityJob & job){
 		job.eigen[i].iroot = new int[maxdeg];
 		job.eigen[i].quanta = new int[job.molec.nmodes+1];
 		job.eigen[i].normal = new int[job.molec.nmodes+1];	
-		job.eigen[i].cgamma = new int[job.molec.nclasses+1];
+		job.eigen[i].cgamma = new char*[job.molec.nclasses+1];
 		job.eigen[i].ndeg = 0;
 	}
 
@@ -1075,11 +1075,14 @@ void read_eigenvalues(FintensityJob & job){
 						for(int q = 0; q < job.molec.nmodes+1; q++)
 							job.eigen[nlevels].quanta[q]  = strtol(line_ptr,&line_ptr,0);
 						strtol(line_ptr,&line_ptr,0); //large_coef part
+						//isym
+						for(int q = 0; q < job.molec.nclasses+1; q++){
+							job.eigen[nlevels].cgamma[q]  = job.molec.c_sym[strtol(line_ptr,&line_ptr,0)-1];
+							//printf("cgamma = %s\n",job.eigen[nlevels].cgamma[q]);
+						}
 						for(int q = 0; q < job.molec.nmodes+1; q++)
 							job.eigen[nlevels].normal[q]  = strtol(line_ptr,&line_ptr,0);
 
-						for(int q = 0; q < job.molec.nclasses+1; q++)
-							job.eigen[nlevels].cgamma[q]  = strtol(line_ptr,&line_ptr,0);
 
 						job.eigen[nlevels].krot       = ktau_rot[job.eigen[nlevels].quanta[0]][0];
 						job.eigen[nlevels].taurot     = ktau_rot[job.eigen[nlevels].quanta[0]][1];

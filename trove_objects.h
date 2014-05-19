@@ -77,7 +77,7 @@ struct TO_PTeigen{
     int ilevel;
     int* quanta;
     int* normal;
-    int* cgamma;
+    char** cgamma;
     double energy;
     int jind;
     int jval;

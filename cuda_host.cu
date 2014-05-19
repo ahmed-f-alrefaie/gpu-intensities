@@ -8,7 +8,12 @@
 
 double pi = 4.0 * atan2(1.0,1.0);
 double A_coef_s_1 = 64.0*pow(10,-36) * pow(pi,4)  / (3.0 * 6.62606896*pow(10,-27));
-double beta;
+double planck = 6.62606896*pow(10,-27);
+double avogno = 6.0221415*pow(10,23);
+double vellgt = 2.99792458*pow(10,10);
+double intens_cm_mol  = 8.0*pow(10,-36) * pow(pi,3)*avogno/(3.0*planck*vellgt);
+double boltz = 1.380658*pow(10,-16);
+    //beta = planck * vellgt / (boltz * intensity%temperature)
 
 void CheckCudaError(const char* tag){
   // check for error
@@ -1295,6 +1300,13 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	//Thread 2 = 2 6 10 14
 	//Thread 3 = 3 7 11 15
 	//Run
+
+
+	//constants
+	double beta = planck * vellgt / (boltz * intensity.temperature);
+	double boltz_fc=0.0;
+	double absorption_int = 0.0;
+
 	for(int ilevelI = device_id; ilevelI < intensity.Neigenlevels; ilevelI+=num_devices){
 		//printf("new I level!\n");
 		//Get the basic infor we need
@@ -1389,7 +1401,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 		}
 		vector_count = vector_idx;
 		
-
+	
 		//printf("memcopy");
 		//Memcopy it in one go
 		cudaMemcpyAsync(gpu_final_vectors,final_vectors,sizeof(double)*intensity.dimenmax*vector_count,cudaMemcpyHostToDevice,intial_f_memcpy) 	;
@@ -1414,15 +1426,17 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			     	 int nsizeF = intensity.bset_contr[indF+1].nsize[igammaF];
 				int irec = intensity.eigen[ilevelF].irec[0]-1;
 				int dimenF = intensity.bset_contr[indF+1].Maxcontracts;
-
+				int ndegF   = intensity.eigen[ilevelF].ndeg;
 				int idegF = 0;
 				int idegI = 0;
 				//for(int i = 0; i < ndeg
 				//Correlate the vectors
-				device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[i]>>>(g_ptrs.bset_contr[indF],0,igammaF, (gpu_final_vectors + i*intensity.dimenmax),gpu_corr_vectors + intensity.dimenmax*i);
-				cublasSetStream(handle,st_ddot_vectors[i]);
-				cublasDdot (handle, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, &line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
-				//cublasDDot(handle,, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, line_str + i + idegF*no_final_states_gpu + idegI*no_final_states_gpu*intensity.molec.sym_maxdegen);
+				for(idegF = 0; idegF < ndegF; idegF++){
+					device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[i]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.dimenmax),gpu_corr_vectors + intensity.dimenmax*i);
+					for(idegI=0; idegI < ndegI; idegI++)
+						cublasDdot (handle, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
+														&line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
+				}
 			
 			}
 			current_buff = 1-current_buff;
@@ -1447,6 +1461,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			      	int * normalF = intensity.eigen[ilevelF].normal;
 			     	 int nsizeF = intensity.bset_contr[indF+1].nsize[igammaF];
 				int irec = intensity.eigen[ilevelF].irec[0]-1;
+				
 				FILE* unitF = eigenvec_unit[ indF + (igammaF)*2]; 			
 
 				ilevelF++;
@@ -1476,15 +1491,23 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			      	int igammaF  = intensity.eigen[ilevelF].igamma;
 			      	int * quantaF = intensity.eigen[ilevelF].quanta;
 			      	int * normalF = intensity.eigen[ilevelF].normal;
-				cudaStreamSynchronize(st_ddot_vectors[i]);
-				double orig_ls = line_str[i];
-				double final_ls = line_str[i];
+				int ndegF   = intensity.eigen[ilevelF].ndeg;
+				double ls=0.0;
+				for(int idegI=0; idegI < ndegI; idegI++){
+					for(int idegF=0; idegF < ndegF; idegF++){
+						ls +=line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]*line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen];
+						
+					}
+				}
+				ls /= double(ndegI);
+				double final_ls = ls;
 				double nu_if = energyF - energyI; 
+             			boltz_fc = abs(nu_if) * exp(-(energyI-intensity.ZPE) * beta) * (1.0 - exp(-abs(nu_if) * beta))/ intensity.q_stat;
 				//Print intensitys
-				final_ls *= final_ls;
 				//printf("line_str %11.4e\n",line_str);
 				double A_einst = A_coef_s_1*double((2*jI)+1)*final_ls*pow(abs(nu_if),3);
-				 final_ls = final_ls * intensity.gns[igammaI] * double( (2*jI + 1)*(2 * jF + 1) );
+				final_ls = final_ls * intensity.gns[igammaI] * double( (2*jI + 1)*(2 * jF + 1) );
+				absorption_int = final_ls * intens_cm_mol * boltz_fc;
 				//if(final_ls < intensity.thresh_linestrength) continue;
 	/*
 				printf("%11.4f\t(%i %i ) ( ",nu_if,jF,intensity.eigen[ilevelF].krot);
@@ -1521,20 +1544,29 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			*/	
 			   #pragma omp critical(output_ls)
 			   {
-			   printf("%4i %4s   <-%4i %4s   %1s  %11.4f <- %11.4f %11.4f  ( %3s %3i ) ( ",jF,"BA",jI,"BS",branch(jF,jI),energyF-intensity.ZPE,energyI-intensity.ZPE,abs(nu_if),"GA",intensity.eigen[ilevelF].krot);
-			   for(int i = 0; i < intensity.molec.nclasses; i++)
-					printf(" %3s","X");
+			   printf("%4i %4s   <-%4i %4s   %1s  %11.4f <- %11.4f %11.4f  ( %3s %3i ) ( ",jF,intensity.molec.c_sym[igammaF],jI,intensity.molec.c_sym[igammaI],branch(jF,jI),energyF-intensity.ZPE,energyI-intensity.ZPE,abs(nu_if),intensity.eigen[ilevelF].cgamma[0],intensity.eigen[ilevelF].krot);
+			   for(int i = 1; i <= intensity.molec.nclasses; i++)
+					printf(" %3s",intensity.eigen[ilevelF].cgamma[i]);
 			   printf(" ");
 			   for(int i = 1; i <= intensity.molec.nmodes; i++)
-					printf(" %3i",intensity.eigen[ilevelF].quanta[i]);
-			   printf(" ) <- ( %3s %3i ) ( ","X",intensity.eigen[ilevelI].krot);
+					printf(" %3i",quantaF[i]);
+			   printf(" ) <- ( %3s %3i ) ( ",intensity.eigen[ilevelI].cgamma[0],intensity.eigen[ilevelI].krot);
 
-			   for(int i = 0; i < intensity.molec.nclasses; i++)
-					printf(" %3s","X");
+			   for(int i = 1; i <= intensity.molec.nclasses; i++)
+					printf(" %3s",intensity.eigen[ilevelI].cgamma[i]);
 			   printf(" ");
 			   for(int i = 1; i <= intensity.molec.nmodes; i++)
-					printf(" %3i",intensity.eigen[ilevelI].quanta[i]);
-			   printf(")  %16.8e %16.8e %16.8e  \n",final_ls,A_einst);
+					printf(" %3i",quantaI[i]);
+			   printf(")  %16.8e %16.8e %16.8e   %6i <- %6i %8i %8i ( ",final_ls,A_einst,absorption_int,intensity.eigen[ilevelF].ilevel,intensity.eigen[ilevelI].ilevel,0,0);
+			   
+			   for(int i = 1; i <= intensity.molec.nmodes; i++)
+					printf(" %3i",normalF[i]);
+			   printf(" ) <-  ( ");
+
+			   for(int i = 1; i <= intensity.molec.nmodes; i++)
+					printf(" %3i",normalI[i]);
+			   printf(" )  %16.9e\n",1.23456789);			
+			   
 			   }
 
 
