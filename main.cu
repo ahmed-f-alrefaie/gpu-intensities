@@ -8,8 +8,34 @@
 #include "fields.h"
 #include "trove_functions.h"
 #include <omp.h>
+#include <sys/time.h>
+#include <ctime>
 
 
+typedef long int int64;
+typedef unsigned long int uint64;
+
+/* Returns the amount of milliseconds elapsed since the UNIX epoch. Works on both
+ * windows and linux. */
+
+int64 GetTimeMs64()
+{
+
+ /* Linux */
+ struct timeval tv;
+
+ gettimeofday(&tv, NULL);
+
+ uint64 ret = tv.tv_usec;
+ /* Convert from micro seconds (10^-6) to milliseconds (10^-3) */
+ ret /= 1000;
+
+ /* Adds the seconds (10^0) after converting them to milliseconds (10^-3) */
+ ret += (tv.tv_sec * 1000);
+
+ return ret;
+
+};
 
 
 
@@ -34,14 +60,17 @@ int main(int argc,char** argv)
 	omp_set_num_threads(num_gpu);
 	//Parallel region here
 	
+	double time = GetTimeMs64();
+
 	#pragma omp parallel default(shared) shared(test_intensity)
 	{
 		int device = omp_get_thread_num();		
 		dipole_do_intensities_async_omp(test_intensity,device,num_gpu);
 	}
 
-
+	time = GetTimeMs64() - time;
 	printf("\ndone\n");
+	printf("\ndone in %.fs\n",time/1000.0);
 	exit(0);
 
 
