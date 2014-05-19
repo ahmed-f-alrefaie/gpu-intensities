@@ -11,7 +11,7 @@ using namespace std;
 void read_symmetry(const char* symchar, FintensityJob* intensity){
 	//Reading symmetry
 	printf("Reading symmetry\n");
-	if(strcmp("C2v(M)",symchar)==0)
+	if(strcmp("C2V(M)",symchar)==0)
 	{
 		//printf("C2v(M) sym");
 		intensity->molec.sym_nrepres = 4;
@@ -40,7 +40,34 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 		strcpy(intensity->molec.c_sym[2],"B1");
 		strcpy(intensity->molec.c_sym[3],"B2");
 
-	}else{
+	}else if(strcmp("C3V(M)",symchar)==0)
+	{
+		//printf("C2v(M) sym");
+		intensity->molec.sym_nrepres = 3;
+		intensity->molec.sym_degen = new int[3];
+		intensity->molec.sym_maxdegen = 2;
+		intensity->isym_do = new bool[3];
+		intensity->molec.sym_degen[0] = 1;
+		intensity->molec.sym_degen[1] = 1;
+		intensity->molec.sym_degen[2] = 2;
+
+		intensity->isym_do[0] = true;
+		intensity->isym_do[1] = true;
+		intensity->isym_do[2] = true;
+		intensity->gns = new double[3];
+		intensity->isym_pairs = new int[3];
+		intensity->igamma_pair = new int[3];
+		intensity->molec.nclasses = 3;
+
+		intensity->molec.c_sym = new char*[3];
+		for(int i = 0; i < 3; i++)
+			intensity->molec.c_sym[i] = new char[10];
+		strcpy(intensity->molec.c_sym[0],"A1");
+		strcpy(intensity->molec.c_sym[1],"A2");
+		strcpy(intensity->molec.c_sym[2],"E");
+
+	}
+	else{
 		printf("Symmetry not implemeted\n");
 		exit(0);
 	}
@@ -171,11 +198,14 @@ void read_fields(FintensityJob* intensity){
 	while(getline(cin,line)){
 		cout<<line<<endl;
 		strcpy (linestr, line.c_str());
+		//CAPS ALL OF IT
+		for(int i = 0; i < line.length(); i++)
+			linestr[i]=toupper(linestr[i]);
 		//Begin Reading
 		line_ptr=strtok(linestr," ,");
 		//This should contai the first variable to check
 		if(line_ptr!= NULL){
-			if(strcmp("Nmodes",line_ptr)==0){
+			if(strcmp("NMODES",line_ptr)==0){
 				line_ptr=strtok(NULL," ,"); //Get the number
 				if(line_ptr!=NULL)intensity->molec.nmodes= strtol(line_ptr,NULL,0); else continue;
 				//Declare the quanta
