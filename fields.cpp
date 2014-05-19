@@ -137,6 +137,25 @@ void read_intensities(FintensityJob* intensity)
 			else if(strcmp("THRESH_LINE",line_ptr)==0){
 				intensity->thresh_linestrength=readd();
 			}
+			else if(strcmp("V",line_ptr)==0){
+				//exit(0);
+				int quanta_no = 0;
+				quanta_no = readi()-1;
+				line_ptr=readc();
+				while(line_ptr!=NULL){
+		
+					if(strcmp("LOWER",line_ptr)==0)
+					{
+						intensity->quanta_lower[0][quanta_no] = readi();
+						intensity->quanta_lower[1][quanta_no] = readi();
+					}else if(strcmp("UPPER",line_ptr)==0)
+					{
+						intensity->quanta_upper[0][quanta_no] = readi();
+						intensity->quanta_upper[1][quanta_no] = readi();
+					}
+					line_ptr=readc();
+				}
+			}
 		}		
 	}
 
@@ -147,6 +166,8 @@ void read_fields(FintensityJob* intensity){
 	string line;
 	char* line_ptr;
 	char linestr[2024];
+	intensity->quanta_lower=NULL;
+	intensity->quanta_upper=NULL;
 	while(getline(cin,line)){
 		cout<<line<<endl;
 		strcpy (linestr, line.c_str());
@@ -156,7 +177,14 @@ void read_fields(FintensityJob* intensity){
 		if(line_ptr!= NULL){
 			if(strcmp("Nmodes",line_ptr)==0){
 				line_ptr=strtok(NULL," ,"); //Get the number
-				if(line_ptr!=NULL)intensity->molec.nmodes= strtol(line_ptr,NULL,0);
+				if(line_ptr!=NULL)intensity->molec.nmodes= strtol(line_ptr,NULL,0); else continue;
+				//Declare the quanta
+				intensity->quanta_lower=new int*[2];
+				intensity->quanta_lower[0]=new int[intensity->molec.nmodes];
+				intensity->quanta_lower[1]=new int[intensity->molec.nmodes];
+				intensity->quanta_upper=new int*[2];
+				intensity->quanta_upper[0]=new int[intensity->molec.nmodes];
+				intensity->quanta_upper[1]=new int[intensity->molec.nmodes];
 				//printf("Nmodes = %i\n",intensity->molec.nmodes);
 			}else if(strcmp("SYMGROUP",line_ptr)==0){
 				line_ptr=strtok(NULL," ");

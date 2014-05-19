@@ -20,6 +20,8 @@ struct FGPU_ptrs{
 	double* dipole_me;
 	double* threej;
 	cuda_bset_contrT** bset_contr;
+	size_t avail_mem;
+	
 };
 
 
@@ -47,6 +49,8 @@ struct FintensityJob{
 	int dimenmax;
 	double thresh_linestrength;
 	int nsizemax;
+	int** quanta_lower;
+	int** quanta_upper;
 	//Will b replaced with something better
 	unsigned long cpu_memory;
 	unsigned long gpu_memory;

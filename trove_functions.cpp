@@ -1126,10 +1126,22 @@ void read_eigenvalues(FintensityJob & job){
 
 bool energy_filter_lower(FintensityJob & job,int J,double energy, int* quanta)
 {
+	for(int i = 0; i < job.molec.nmodes; i++){
+		if(quanta[i+1] < job.quanta_lower[0][i])
+			return false;
+		if(quanta[i+1] > job.quanta_lower[1][i])
+			return false;
+	}
 	return J >= job.jvals[0] &&  J <= job.jvals[1] && (energy-job.ZPE) >= job.erange_lower[0] &&  (energy-job.ZPE) <= job.erange_lower[1];
 }
 bool energy_filter_upper(FintensityJob & job,int J,double energy, int* quanta)
 {
+	for(int i = 0; i < job.molec.nmodes; i++){
+		if(quanta[i+1] < job.quanta_upper[0][i])
+			return false;
+		if(quanta[i+1] > job.quanta_upper[1][i])
+			return false;
+	}
 	return J >= job.jvals[0] &&  J <= job.jvals[1] && (energy-job.ZPE) >= job.erange_upper[0] &&  (energy-job.ZPE) <= job.erange_upper[1];
 }
 bool intensity_filter(FintensityJob & job,int jI,int jF,double energyI,double energyF,int igammaI,int igammaF,int* quantaI,int* quantaF){

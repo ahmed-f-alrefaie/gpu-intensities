@@ -11,7 +11,7 @@ PLAT =
 NVCC = nvcc
 FOR = icc
 NVCCFLAGS := --ptxas-options=-v -O3 -gencode arch=compute_20,code=sm_20 -Xptxas -v 
-FFLAGS = -O3 -g -cxxlib -debug -openmp
+FFLAGS = -O3 -g -cxxlib -debug -openmp -traceback
 #-O3 -ipo -xHost -g -traceback
 CUDADIR = /shared/ucl/apps/cuda/4.0
 LIBS= -L$(CUDA_HOME)/lib64 -lcudart -lcuda -liomp5 -lcublas

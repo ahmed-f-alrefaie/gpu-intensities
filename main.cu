@@ -25,13 +25,13 @@ int main(int argc,char** argv)
 	//dipole_do_intensities_async(test_intensity,0);
 	//Set number of threads
 	omp_set_dynamic(0);
-	omp_set_num_threads(8);
+	omp_set_num_threads(1);
 	//Parallel region here
 	
 	#pragma omp parallel default(shared) shared(test_intensity)
 	{
 		int device = omp_get_thread_num();		
-		dipole_do_intensities_async_omp(test_intensity,device,8);
+		dipole_do_intensities_async_omp(test_intensity,device,1);
 	}
 	exit(0);
 

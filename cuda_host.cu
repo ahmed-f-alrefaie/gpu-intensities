@@ -101,14 +101,6 @@ void get_cuda_info(FintensityJob & intensity){
         cudaGetDeviceProperties(&devProp, i);
         printDevProp(devProp);
     }    // Iterate through devices
-    for (int i = 0; i < devCount; ++i)
-    {
-        // Get device properties
-        printf("\nCUDA Device #%d\n", i);
-        cudaDeviceProp devProp;
-        cudaGetDeviceProperties(&devProp, i);
-        printDevProp(devProp);
-    }
 
 }
 
@@ -1126,8 +1118,14 @@ __host__ void dipole_initialise_cpu(FintensityJob* intensity){
 	
 };
 
-__host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptrs){
+__host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptrs,int device_id){
 	int jmax = max(intensity->jvals[0],intensity->jvals[1]);
+
+	//Get available memory
+        cudaDeviceProp devProp;
+        cudaGetDeviceProperties(&devProp, device_id);
+	g_ptrs.avail_mem = size_t(double(devProp.totalGlobalMem)*0.95);
+
 	//Begin GPU related initalisation////////////////////////////////////////////////////////
 	intensity_info int_gpu;
 	//Copy over constants to GPU
@@ -1139,6 +1137,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 	int_gpu.sq2 = 1.0/sqrt(2.0);
 
 	copy_array_to_gpu((void*)intensity->molec.sym_degen,(void**)&int_gpu.sym_degen,sizeof(int)*intensity->molec.sym_nrepres,"sym_degen");
+	g_ptrs.avail_mem -= sizeof(int)*intensity->molec.sym_nrepres;
 
 	CheckCudaError("Pre-initial");
 	printf("Copy intensity information\n");	
@@ -1159,6 +1158,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 	printf("Copying dipole\n");
 	copy_array_to_gpu((void*)intensity->dipole_me,(void**)&(g_ptrs.dipole_me),intensity->dip_size,"dipole_me");
 	printf("Done..");
+	g_ptrs.avail_mem -=intensity->dip_size;
 }
 
 __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int device_id,int num_devices){
@@ -1173,20 +1173,26 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	//Setup the gpu pointers
 	FGPU_ptrs g_ptrs;
-	dipole_initialise_gpu(&intensity,g_ptrs); // Initialise the gpu pointers
+	dipole_initialise_gpu(&intensity,g_ptrs,device_id); // Initialise the gpu pointers
 	
 
 
 	//Prinf get available cpu memory
-	unsigned long available_cpu_memory = intensity.cpu_memory;
-	unsigned long available_gpu_memory = intensity.gpu_memory;
+	//unsigned long available_cpu_memory = intensity.cpu_memory;
+	unsigned long available_gpu_memory = g_ptrs.avail_mem;
 
 	int nJ = 2;
 
 	//Compute how many inital state vectors and final state vectors
-	unsigned long no_final_states_cpu = ((available_cpu_memory)/8l - long(2*intensity.dimenmax))/(3l*intensity.dimenmax);//(Initial + vec_cor + half_ls)*dimen_max
-	unsigned long no_final_states_gpu = ((available_gpu_memory)/8l - long(2*intensity.dimenmax))/(3l*intensity.dimenmax);//(Initial + vec_cor + half_ls)*dimen_max
+	//unsigned long no_final_states_cpu = ((available_cpu_memory)/8l - long(2*intensity.dimenmax))/(3l*intensity.dimenmax);//(Initial + vec_cor + half_ls)*dimen_max
+	unsigned long no_final_states_gpu = available_gpu_memory;
+	no_final_states_gpu -=	sizeof(double)*size_t(intensity.dimenmax)*(size_t(nJ*intensity.molec.sym_maxdegen) + 1l );
+	no_final_states_gpu /= ( 2l * size_t(intensity.dimenmax) );
 
+	printf("%d\n",no_final_states_gpu);
+	no_final_states_gpu/=sizeof(double);
+	printf("%d\n",no_final_states_gpu);
+//	exit(0);
 	no_final_states_gpu = min((unsigned int )intensity.Neigenlevels,(unsigned int )no_final_states_gpu)/2l;//half are the eigenvectors, the other half are the correlations
 
 	//printf("No of final states in gpu_memory: %d  cpu memory: %d\n",no_final_states_gpu,no_final_states_cpu);
@@ -1481,9 +1487,9 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			cudaDeviceSynchronize();
 			cudaMemcpyAsync(gpu_final_vectors,final_vectors,sizeof(double)*intensity.dimenmax*vector_count,cudaMemcpyHostToDevice,intial_f_memcpy) ;
 			//We'e done now lets output
-			for(int i = 0; i < vector_count; i++)
+			for(int ivec = 0; ivec < vector_count; ivec++)
 			{
-				ilevelF = vec_ilevel_buff[1-current_buff][i];
+				ilevelF = vec_ilevel_buff[1-current_buff][ivec];
 				//printf("ilevelF=%i\n",ilevelF);
 				int indF = intensity.eigen[ilevelF].jind;
 			      	int jF = intensity.eigen[ilevelF].jval;
@@ -1493,9 +1499,9 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			      	int * normalF = intensity.eigen[ilevelF].normal;
 				int ndegF   = intensity.eigen[ilevelF].ndeg;
 				double ls=0.0;
-				for(int idegI=0; idegI < ndegI; idegI++){
-					for(int idegF=0; idegF < ndegF; idegF++){
-						ls +=line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]*line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen];
+			        for(int idegF=0; idegF < ndegF; idegF++){
+				      for(int idegI=0; idegI < ndegI; idegI++){
+						ls +=line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]*line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen];
 						
 					}
 				}
@@ -1565,8 +1571,15 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 			   for(int i = 1; i <= intensity.molec.nmodes; i++)
 					printf(" %3i",normalI[i]);
-			   printf(" )  %16.9e\n",1.23456789);			
-			   
+			   printf(" ) ");
+			   //printf(" )  %16.9e\n",1.23456789);	
+			   for(int idegF=0; idegF < ndegF; idegF++){
+				 for(int idegI=0; idegI < ndegI; idegI++){
+						printf(" %16.9e",line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
+						
+					}
+				}		
+			    printf("\n");
 			   }
 
 
