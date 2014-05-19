@@ -1,5 +1,5 @@
 #pragma once
-#define NDEBUG
+//#define NDEBUG
 typedef unsigned int uint;
 
 //extern int sym_nrepres;

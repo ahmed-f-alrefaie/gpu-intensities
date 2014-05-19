@@ -321,7 +321,7 @@ __host__ void dipole_initialise(FintensityJob* intensity){
 	
 	int jmax = max(intensity->jvals[0],intensity->jvals[1]);
 
-	//Now create the bset_contrs
+
 	bset_contr_factory(&(intensity->bset_contr[0]),0,intensity->molec.sym_degen,intensity->molec.sym_nrepres);
 	bset_contr_factory(&(intensity->bset_contr[1]),intensity->jvals[0],intensity->molec.sym_degen,intensity->molec.sym_nrepres);
 	bset_contr_factory(&(intensity->bset_contr[2]),intensity->jvals[1],intensity->molec.sym_degen,intensity->molec.sym_nrepres);
@@ -1072,9 +1072,11 @@ __host__ void dipole_initialise_cpu(FintensityJob* intensity){
 	printf("End Input\n");
 	
 	int jmax = max(intensity->jvals[0],intensity->jvals[1]);
-
+	//Now create the bset_contrs
+	printf("Sym_nrepsres = %i\n",intensity->molec.sym_nrepres);
 	//Now create the bset_contrs
 	bset_contr_factory(&(intensity->bset_contr[0]),0,intensity->molec.sym_degen,intensity->molec.sym_nrepres);
+	intensity->molec.nclasses = intensity->bset_contr[0].Nclasses;
 	bset_contr_factory(&(intensity->bset_contr[1]),intensity->jvals[0],intensity->molec.sym_degen,intensity->molec.sym_nrepres);
 	bset_contr_factory(&(intensity->bset_contr[2]),intensity->jvals[1],intensity->molec.sym_degen,intensity->molec.sym_nrepres);
 

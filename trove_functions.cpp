@@ -232,7 +232,7 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
 	
 	if(trim(line).compare("Start Primitive basis set")!=0)
 	{
-		printf("[bset_contr_factory]: bad header");
+		printf("[bset_contr_factory]: bad header %s",filename);
 		fprintf(stderr,"[bset_contr_factory]: bad header");
 		exit(0);
 	}	
@@ -364,7 +364,7 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
 	
 		//Begin reading
 	getline(eig_qu,line);
-	
+	//cout<<line<<endl;
 	if(trim(line).compare("Start irreducible transformation")!=0)
 	{
 		printf("[bset_contr_factory]: wrong sym-footer");
@@ -376,15 +376,17 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
 	bset_contr->Ntotal = new int[sym_nrepres];
 	getline(eig_qu,line);
 	mat_size = strtol(line.c_str(),&line_ptr,0);
+	//cout<<line<<endl;
 	bset_contr->mat_size = mat_size;
 	//read(iounit,*) Ntotal(1:sym%Nrepresen)
 	getline(eig_qu,line);
 	bset_contr->Ntotal[0] = strtol(line.c_str(),&line_ptr,0); 
+	//cout<<line<<endl;
 	for(int i = 1; i < sym_nrepres; i++)
 		bset_contr->Ntotal[i] = strtol(line_ptr,&line_ptr,0);
 	
 	//(bset_contr(jind)%irr(igamma)%N(bset_contr(jind)%Maxsymcoeffs),bset_contr(jind)%irr(igamma)%repres(Ntotal(igamma),sym%degen(igamma),mat_size)
-	
+	//printf("nrepres = %i",sym_nrepres);
 	for(int igamma = 0; igamma < sym_nrepres; igamma++)
 	{
 		bset_contr->irr[igamma].N = new int[bset_contr->Maxsymcoeffs];
@@ -473,24 +475,31 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 	//allocate(cnu_i(1:nclasses),cnu_j(1:nclasses),stat = info)
 	cnu_i = new int[nclasses];
 	cnu_j = new int[nclasses];
-	
+	//printf("Maxsymj0 = %i %i\n",bset_contrj0.Maxsymcoeffs,	bset_contrj0.max_deg_size);
+	//printf("Maxsym = %i %i\n",bset_contr.Maxsymcoeffs,bset_contr.max_deg_size);
+
 	//allocate(bset_contr(jind)%icontr_correlat_j0(bset_contr(jind)%Maxsymcoeffs,bset_contr(jind)%max_deg_size), stat = info)
 	bset_contr.icontr_correlat_j0 = new int[bset_contr.Maxsymcoeffs*bset_contr.max_deg_size];
-	https://www.youtube.com/watch?v=r2tYJoocSgg
+	//printf("Start_correlation\n");
+	//bool contract_space;
+	//bool index_deg;
 	//do icase = 1, bset_contr(jind)%Maxsymcoeffs
 	for(icase = 0; icase < bset_contr.Maxsymcoeffs; icase++)
-	{
+	{	
+ 		//printf("icase=%i\n",icase);
 		//cnu_i(1:nclasses) = bset_contr(jind)%contractive_space(1:nclasses, icase)
 		memcpy(cnu_i,bset_contr.contractive_space + icase*(nclasses+1) + 1,sizeof(int)*nclasses);
 		//do ilambda = 1, bset_contr(jind)%index_deg(icase)%size1
 		for(ilambda = 0; ilambda < bset_contr.index_deg[icase].size1; ilambda++)
 		{
 			found = false;
+
 			//do jcase = 1, bset_contr(1)%Maxsymcoeffs
 			for(jcase = 0; jcase < bset_contrj0.Maxsymcoeffs; jcase++)
 			{
 				//cnu_j(1:nclasses) = bset_contr(1)%contractive_space(1:nclasses, jcase)
-				memcpy(cnu_j,bset_contrj0.contractive_space + jcase*(nclasses+1) + 1,sizeof(int)*nclasses);
+
+				memcpy(cnu_j,bset_contrj0.contractive_space + (1 + jcase*(nclasses+1)),sizeof(int)*nclasses);
 				//do jlambda = 1, bset_contr(1)%index_deg(jcase)%size1
 				for(jlambda = 0; jlambda < bset_contrj0.index_deg[jcase].size1; jlambda++)
 				{
@@ -502,9 +511,10 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
                  			        exit l_jcase
                 			         !
                  					endif
-               					  */ 
-					if(memcmp(cnu_i,cnu_j,sizeof(int)*nclasses)==0 && memcmp(bset_contrj0.index_deg[jcase].icoeffs + jlambda*nclasses,
-												 bset_contr.index_deg[icase].icoeffs + ilambda*nclasses,
+               					  */  
+
+					if(memcmp(cnu_i,cnu_j,sizeof(int)*nclasses)==0 && memcmp(bset_contrj0.index_deg[jcase].icoeffs + jlambda*(nclasses+1) + 1,
+												 bset_contr.index_deg[icase].icoeffs + ilambda*(nclasses+1) + 1,
 												 sizeof(int)*nclasses)==0)
 					{
 						found = true;
@@ -515,17 +525,22 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 			}//jcase
 			if(!found)
 			{
+				printf("icase =%i ilambda = %i\n",icase,ilambda);
 				printf("[index_correlation] not found for J = %i -> problems with checkpoints?\n", bset_contr.jval);
 				fprintf(stderr,"[index_correlation] No correlation for J = %i\n", bset_contr.jval);
 				exit(0);
 			}
-			
+			//printf("Done!");
 			//jcontr = bset_contr(1)%icase2icontr(jcase,jlambda)
-			jcontr = bset_contrj0.icase2icontr[jcase + jlambda*bset_contrj0.Maxcontracts];
-			bset_contr.icontr_correlat_j0[icase + ilambda*bset_contrj0.Maxcontracts] = jcontr;
+			jcontr = bset_contrj0.icase2icontr[jcase + jlambda*bset_contrj0.Maxsymcoeffs];
+			//printf("jcontr = %i\n",jcontr);
+			bset_contr.icontr_correlat_j0[icase + ilambda*bset_contr.Maxsymcoeffs] = jcontr;
+			//             jcontr = bset_contr(1)%icase2icontr(jcase,jlambda)
+            // !
+            // bset_contr(jind)%icontr_correlat_j0(icase, ilambda) = jcontr
 		}//ilambda
 	}//icase
-	
+	//printf("Finished correlation");
 //	       allocate(bset_contr(jind)%iroot_correlat_j0(bset_contr(jind)%Maxcontracts), stat = info)
 //       call ArrayStart('bset_contr',info,size(bset_contr(jind)%iroot_correlat_j0),kind(bset_contr(jind)%iroot_correlat_j0))
 //       allocate(bset_contr(jind)%ktau(bset_contr(jind)%Maxcontracts), stat = info)
