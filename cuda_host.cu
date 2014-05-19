@@ -1125,7 +1125,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
         cudaDeviceProp devProp;
         cudaGetDeviceProperties(&devProp, device_id);
 	g_ptrs.avail_mem = size_t(double(devProp.totalGlobalMem)*0.95);
-
+	printf("Available gpu memory = %2.4f GB",float(g_ptrs.avail_mem)/(1024.0f*1024.0f*1024.0f));
 	//Begin GPU related initalisation////////////////////////////////////////////////////////
 	intensity_info int_gpu;
 	//Copy over constants to GPU
@@ -1140,24 +1140,24 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 	g_ptrs.avail_mem -= sizeof(int)*intensity->molec.sym_nrepres;
 
 	CheckCudaError("Pre-initial");
-	printf("Copy intensity information\n");	
+	printf("Copy intensity information...");	
 	copy_intensity_info(&int_gpu);
-	printf("done\n");
+	printf("done...");
 	CheckCudaError("Post-initial");
-	printf("Copying bset_contrs to GPU...\n");
+	printf("Copying bset_contrs to GPU...");
 	g_ptrs.bset_contr = new cuda_bset_contrT*[2];
 	create_and_copy_bset_contr_to_gpu(&intensity->bset_contr[1],&(g_ptrs.bset_contr[0]),intensity->bset_contr[1].ijterms,intensity->molec.sym_nrepres,intensity->molec.sym_degen);
 	create_and_copy_bset_contr_to_gpu(&intensity->bset_contr[2],&(g_ptrs.bset_contr[1]),intensity->bset_contr[2].ijterms,intensity->molec.sym_nrepres,intensity->molec.sym_degen);
 
-	printf("Done\n");
-	
-	printf("Copying threej...\n");
-	copy_threej_to_gpu(intensity->threej,&(g_ptrs.threej), jmax);
-	printf("done\n");
-
-	printf("Copying dipole\n");
-	copy_array_to_gpu((void*)intensity->dipole_me,(void**)&(g_ptrs.dipole_me),intensity->dip_size,"dipole_me");
 	printf("Done..");
+	
+	printf("Copying threej...");
+	copy_threej_to_gpu(intensity->threej,&(g_ptrs.threej), jmax);
+	printf("done..");
+
+	printf("Copying dipole...");
+	copy_array_to_gpu((void*)intensity->dipole_me,(void**)&(g_ptrs.dipole_me),intensity->dip_size,"dipole_me");
+	printf("Done\n");
 	g_ptrs.avail_mem -=intensity->dip_size;
 }
 
@@ -1166,34 +1166,50 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	cudaThreadExit(); // clears all the runtime state for the current thread
 	cudaSetDevice(device_id); //Set the device name
 	//Wake up the gpu//
-	printf("Wake up gpu\n");
+	//printf("Wake up gpu\n");
 	cudaFree(0);
-	printf("....Done!\n");
+	//printf("....Done!\n");
 
 
+
+	int nJ = 2;
 	//Setup the gpu pointers
 	FGPU_ptrs g_ptrs;
 	dipole_initialise_gpu(&intensity,g_ptrs,device_id); // Initialise the gpu pointers
+	//Prinf get available cpu memory
+	//unsigned long available_cpu_memory = intensity.cpu_memory;
+	size_t available_gpu_memory = g_ptrs.avail_mem;
+	printf("Available gpu memory = %2.4f GB\n",float(available_gpu_memory)/(1024.0f*1024.0f*1024.0f));
+	//Compute how many inital state vectors and final state vectors
+	//unsigned long no_final_states_cpu = ((available_cpu_memory)/8l - long(2*intensity.dimenmax))/(3l*intensity.dimenmax);//(Initial + vec_cor + half_ls)*dimen_max
+	size_t no_final_states_gpu = available_gpu_memory/sizeof(double);
+	no_final_states_gpu -=	size_t(intensity.dimenmax)*( 1+ nJ*intensity.molec.sym_maxdegen);
+	no_final_states_gpu /= ( 2l * size_t(intensity.dimenmax) );
+	no_final_states_gpu /=2;
+	printf("%d\n",no_final_states_gpu);
+	no_final_states_gpu = min((unsigned int )intensity.Neigenlevels,(unsigned int )no_final_states_gpu);
+
+	printf("%d\n",no_final_states_gpu);
+	//printf("Memory=%.f KB\n",float(no_final_states_gpu*sizeof(double))/float(1024));
+	//no_final_states_gpu/=sizeof(double);
+	//printf("%d\n",no_final_states_gpu);
+
+	//exit(0);
+
+
+	//Print out the header
+	// write(out,"(/t4'J',t6'Gamma <-',t17'J',t19'Gamma',t25'Typ',t35'Ei',t42'<-',t50'Ef',t62'nu_if',&
+       //           &t85,<nclasses>(4x),1x,<nmodes>(4x),3x,'<-',14x,<nclasses>(4x),1x,<nmodes>(4x),&
+        //          &8x,'S(f<-i)',10x,'A(if)',12x,'I(f<-i)',12x,'Ni',8x,'Nf',8x,'N')")
+
+
+
 	
 
 
-	//Prinf get available cpu memory
-	//unsigned long available_cpu_memory = intensity.cpu_memory;
-	unsigned long available_gpu_memory = g_ptrs.avail_mem;
 
-	int nJ = 2;
-
-	//Compute how many inital state vectors and final state vectors
-	//unsigned long no_final_states_cpu = ((available_cpu_memory)/8l - long(2*intensity.dimenmax))/(3l*intensity.dimenmax);//(Initial + vec_cor + half_ls)*dimen_max
-	unsigned long no_final_states_gpu = available_gpu_memory;
-	no_final_states_gpu -=	sizeof(double)*size_t(intensity.dimenmax)*(size_t(nJ*intensity.molec.sym_maxdegen) + 1l );
-	no_final_states_gpu /= ( 2l * size_t(intensity.dimenmax) );
-
-	printf("%d\n",no_final_states_gpu);
-	no_final_states_gpu/=sizeof(double);
-	printf("%d\n",no_final_states_gpu);
 //	exit(0);
-	no_final_states_gpu = min((unsigned int )intensity.Neigenlevels,(unsigned int )no_final_states_gpu)/2l;//half are the eigenvectors, the other half are the correlations
+	//half are the eigenvectors, the other half are the correlations
 
 	//printf("No of final states in gpu_memory: %d  cpu memory: %d\n",no_final_states_gpu,no_final_states_cpu);
 
@@ -1235,9 +1251,18 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	//Copy them to the gpu
 	copy_array_to_gpu((void*)initial_vector,(void**)&(gpu_initial_vector),sizeof(double)*intensity.dimenmax,"gpu_initial_vector");
+	available_gpu_memory -= sizeof(double)*intensity.dimenmax;
+
 	copy_array_to_gpu((void*)final_vectors,(void**)&(gpu_final_vectors),sizeof(double)*intensity.dimenmax*no_final_states_gpu,"gpu_final_vectors");
+	CheckCudaError("gpu_final_vectors");
+	available_gpu_memory -= sizeof(double)*intensity.dimenmax*no_final_states_gpu;
 	copy_array_to_gpu((void*)final_vectors,(void**)&(gpu_corr_vectors),sizeof(double)*intensity.dimenmax*no_final_states_gpu,"gpu_corr_vectors");
+	CheckCudaError("gpu_corr_vectors");
+	available_gpu_memory -= sizeof(double)*intensity.dimenmax*no_final_states_gpu;
 	copy_array_to_gpu((void*)half_ls,(void**)&(gpu_half_ls),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_half_ls");
+	available_gpu_memory -= sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen;
+	CheckCudaError("gpu_half_ls");
+	printf("Available gpu memory = %.f Number of states = %d\n",float(available_gpu_memory)/float((1024l*1024l*1024l)),available_gpu_memory);
 	//copy_array_to_gpu((void*)line_str,(void**)&(gpu_line_str),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_line_str");
 	//Open the eigenvector units
 	char filename[1024];
@@ -1307,7 +1332,12 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	//Thread 3 = 3 7 11 15
 	//Run
 
+	#pragma omp barrier
+	if(device_id==0){
+		printf("Linestrength S(f<-i) [Debye**2], Transition moments [Debye],Einstein coefficient A(if) [1/s],and Intensities [cm/mol]\n\n\n");
+	}
 
+	#pragma omp barrier
 	//constants
 	double beta = planck * vellgt / (boltz * intensity.temperature);
 	double boltz_fc=0.0;
@@ -1601,6 +1631,8 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	
 
 	}
+	cudaDeviceReset();
+	cudaFreeHost(&final_vectors);
 
 	
 

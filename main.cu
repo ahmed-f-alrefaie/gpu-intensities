@@ -3,6 +3,7 @@
 #include "cuda_host.cuh"
 #include "dipole_kernals.cuh"
 #include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include "fields.h"
 #include "trove_functions.h"
@@ -15,7 +16,7 @@
 int main(int argc,char** argv)
 {
 	////////----------THIS IS TESTED ON AN EMPTY 8 GPU NODE ON EMERALD
-	printf("%12.6f\n",three_j(2,3,1,1,-1,0));
+	//printf("%12.6f\n",three_j(2,3,1,1,-1,0));
 	FintensityJob test_intensity;
 	//get_cuda_info(test_intensity);
 	//exit(0);
@@ -24,15 +25,23 @@ int main(int argc,char** argv)
 	//dipol_do_intensities(test_intensity);
 	//dipole_do_intensities_async(test_intensity,0);
 	//Set number of threads
+	char* gpu_env = getenv("NUM_GPUS");
+	int num_gpu = 1;	
+	if(gpu_env!=NULL){
+		num_gpu = atoi(gpu_env);
+	}
 	omp_set_dynamic(0);
-	omp_set_num_threads(1);
+	omp_set_num_threads(num_gpu);
 	//Parallel region here
 	
 	#pragma omp parallel default(shared) shared(test_intensity)
 	{
 		int device = omp_get_thread_num();		
-		dipole_do_intensities_async_omp(test_intensity,device,1);
+		dipole_do_intensities_async_omp(test_intensity,device,num_gpu);
 	}
+
+
+	printf("\ndone\n");
 	exit(0);
 
 
