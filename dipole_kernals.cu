@@ -63,7 +63,7 @@ __global__ void device_correlate_vectors(cuda_bset_contrT* bset_contr,int idegI,
 		nelem = bset_contr->N[igammaI + irow*int_info.sym_nrepres];
 	
 		Ntot = bset_contr->Ntotal[igammaI];
-		sdeg = int_info.sym_degen[igammaI]-1;
+		sdeg = int_info.sym_degen[igammaI];
 		double* irr = bset_contr->irr_repres[igammaI];
 		
 		for(int i = 0; i < nelem; i++)

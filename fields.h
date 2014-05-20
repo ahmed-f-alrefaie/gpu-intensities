@@ -51,6 +51,7 @@ struct FintensityJob{
 	int nsizemax;
 	int** quanta_lower;
 	int** quanta_upper;
+	bool host_dipole;
 	//Will b replaced with something better
 	unsigned long cpu_memory;
 	unsigned long gpu_memory;

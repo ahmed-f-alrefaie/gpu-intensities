@@ -5,7 +5,7 @@
 
 #include <cstdio>
 #include <cstdlib>
-
+#include <omp.h>
 double pi = 4.0 * atan2(1.0,1.0);
 double A_coef_s_1 = 64.0*pow(10,-36) * pow(pi,4)  / (3.0 * 6.62606896*pow(10,-27));
 double planck = 6.62606896*pow(10,-27);
@@ -104,6 +104,18 @@ void get_cuda_info(FintensityJob & intensity){
 
 }
 
+__host__ void copy_dipole_host(double* dipole_me,double** dipole_me_host,size_t & dip_size)
+{
+	printf("Alloc");
+	cudaMallocHost(dipole_me_host,dip_size); //Malloc to pinned memory
+	printf("memcpy");	
+memcpy(dipole_me_host,dipole_me,dip_size);
+	
+	
+}
+
+
+
 
 __host__ void copy_array_to_gpu(void* arr,void** arr_gpu,size_t arr_size,const char* arr_name)
 {
@@ -124,8 +136,10 @@ __host__ void copy_array_to_gpu(void* arr,void** arr_gpu,size_t arr_size,const c
 
 //Copies relevant information needed to do intensity calculations onto the gpu
 //Arguments p1: The bset_contr to copy p2: A device memory pointer to copy to
-__host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT* bset_gptr,int* ijterms,int sym_nrepres,int*sym_degen)
+//Returns how much memory was used in bytes
+__host__ size_t copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT* bset_gptr,int* ijterms,int sym_nrepres,int*sym_degen)
 {
+	size_t memory_used = 0;
 	printf("Copying bset_contr for J=%i to gpu........",bset_contr->jval);
 	//construct a gpu_bset_contr
 	cuda_bset_contrT to_gpu_bset;
@@ -146,6 +160,8 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 		fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't allocate memory for icontr2icase for J=%i\n",to_gpu_bset.jval);
 		exit(0);
 	}
+	memory_used += sizeof(int)*bset_contr->Maxcontracts*2;
+
 	//give the pointer to the cuda object
 	to_gpu_bset.icontr2icase = icontr_gptr;
 	
@@ -154,6 +170,7 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	{
 		fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't copy icontr2icase to gpu for J=%i\n",to_gpu_bset.jval);
 	}
+
 	////////////////////////////////////////////////////////////////////////
 	printf("copy iroot\n");
 	////////////////////////////////Same for iroot_correlat_j0///////////////////////////////////////////////////
@@ -166,7 +183,9 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	}
 	//give the pointer to the cuda object
 	to_gpu_bset.iroot_correlat_j0 = iroot_corr_gptr;
-	
+
+	memory_used += sizeof(int)*bset_contr->Maxcontracts;	//Add memory used
+
 	//Copy over
 	if(cudaSuccess != cudaMemcpy(iroot_corr_gptr,bset_contr->iroot_correlat_j0,sizeof(int)*bset_contr->Maxcontracts,cudaMemcpyHostToDevice))
 	{
@@ -185,13 +204,13 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	}
 	//give the pointer to the cuda object
 	to_gpu_bset.k = k_gptr;
+	memory_used += sizeof(int)*bset_contr->Maxcontracts;
 	
 	//Copy over
 	if(cudaSuccess != cudaMemcpy(k_gptr,bset_contr->k,sizeof(int)*bset_contr->Maxcontracts,cudaMemcpyHostToDevice))
 	{
 		fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't copy k to gpu for J=%i\n",to_gpu_bset.jval);
 	}	
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////		KTau		////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,6 +224,7 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	}
 	//give the pointer to the cuda object
 	to_gpu_bset.ktau = kt_gptr;
+	memory_used += sizeof(int)*bset_contr->Maxcontracts;
 	
 	//Copy over
 	if(cudaSuccess != cudaMemcpy(kt_gptr,bset_contr->ktau,sizeof(int)*bset_contr->Maxcontracts,cudaMemcpyHostToDevice))
@@ -212,7 +232,6 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 		fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't copy ktau to gpu for J=%i\n",to_gpu_bset.jval);
 		exit(0);
 	}	
-	
 	///////////////////////////////////////////////N///////////////////////////////////////////////////////////////////
 	printf("copy N\n");
 	int* N_gptr;
@@ -220,19 +239,26 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	{
 		fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't allocate memory for N for J=%i\n",to_gpu_bset.jval);
 	}
+	memory_used += sizeof(int)*sym_nrepres*bset_contr->Maxsymcoeffs;
+
 	to_gpu_bset.N = N_gptr;
+
 	printf("Malloc\n");
+
 	int* Ncopy = (int*)malloc(sizeof(int)*sym_nrepres*bset_contr->Maxsymcoeffs);
+
 	printf("Make copy\n");
-	for(int i = 0; i < sym_nrepres; i++)
+
+	for(int i = 0; i < sym_nrepres; i++){
 		for(int j = 0; j < bset_contr->Maxsymcoeffs; j++)
 		{
 			Ncopy[ i + (j*sym_nrepres)] = bset_contr->irr[i].N[j];
 			//printf("N[%i,%i] = %i %i\n",i,j,Ncopy[ i + (j*sym_nrepres)],bset_contr->irr[i].N[j]);
 		}
+	}
 	printf("Copy\n");		
 	cudaMemcpy(N_gptr,Ncopy,sizeof(int)*sym_nrepres*bset_contr->Maxsymcoeffs,cudaMemcpyHostToDevice);
-	
+
 	to_gpu_bset.N = N_gptr;
 	
 	free(Ncopy);
@@ -253,7 +279,8 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	{
 		fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't allocate memory for irreducible representation for J=%i\n",to_gpu_bset.jval);
 		exit(0);
-	}	
+	}
+	memory_used += sizeof(double*)*sym_nrepres;	
 	
 	to_gpu_bset.irr_repres = irr_gptr;
 	
@@ -268,6 +295,7 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 			fprintf(stderr,"[copy_bset_contr_to_gpu]: Couldn't allocate memory for irreducible representation for J=%i\n",to_gpu_bset.jval);
 			exit(0);
 		}
+		memory_used += sizeof(double)*bset_contr->Ntotal[i]*sym_degen[i]*bset_contr->mat_size;
 		//copy repres to irr_repres
 		cudaMemcpy(d_ptr[i],bset_contr->irr[i].repres,sizeof(double)*bset_contr->Ntotal[i]*sym_degen[i]*bset_contr->mat_size,cudaMemcpyHostToDevice);
 	}
@@ -280,23 +308,25 @@ __host__ void copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT
 	printf("copy ijterms size = %i\n",bset_contr->Maxsymcoeffs*sym_nrepres);
 	//Copy ijterms
 	copy_array_to_gpu((void*)ijterms,(void**)&(to_gpu_bset.ijterms),sizeof(int)*bset_contr->Maxsymcoeffs*sym_nrepres,"ijterms");
-	
+	memory_used += sizeof(int)*bset_contr->Maxsymcoeffs*sym_nrepres;
 	printf("copy final bset\n");
 	/////////////////////////////////copy object over////////////////////////////////
 	cudaMemcpy(bset_gptr,&to_gpu_bset,sizeof(cuda_bset_contrT),cudaMemcpyHostToDevice);
 	
 	printf(".....done!\n");
 
+	return memory_used;
+
 };
 
-__host__ void create_and_copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT** bset_gptr,int* ijterms,int sym_nrepres,int*sym_degen)
+__host__ size_t create_and_copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT** bset_gptr,int* ijterms,int sym_nrepres,int*sym_degen)
 {
 	if(cudaSuccess != cudaMalloc(bset_gptr,sizeof(cuda_bset_contrT) ) )
 	{
 		fprintf(stderr,"[create_and_copy_bset_contr_to_gpu]: Couldn't allocate memory for bset\n");
 		exit(0);
 	}
-	copy_bset_contr_to_gpu( bset_contr,*bset_gptr,ijterms,sym_nrepres,sym_degen);
+	return copy_bset_contr_to_gpu( bset_contr,*bset_gptr,ijterms,sym_nrepres,sym_degen);
 }
 
 //Copy threej
@@ -1128,6 +1158,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
         cudaGetDeviceProperties(&devProp, device_id);
 	g_ptrs.avail_mem = size_t(double(devProp.totalGlobalMem)*0.95);
 	printf("Available gpu memory = %2.4f GB",float(g_ptrs.avail_mem)/(1024.0f*1024.0f*1024.0f));
+	printf("Total global memory:           %u\n",  devProp.totalGlobalMem);
 	//Begin GPU related initalisation////////////////////////////////////////////////////////
 	intensity_info int_gpu;
 	//Copy over constants to GPU
@@ -1148,19 +1179,53 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 	CheckCudaError("Post-initial");
 	printf("Copying bset_contrs to GPU...");
 	g_ptrs.bset_contr = new cuda_bset_contrT*[2];
-	create_and_copy_bset_contr_to_gpu(&intensity->bset_contr[1],&(g_ptrs.bset_contr[0]),intensity->bset_contr[1].ijterms,intensity->molec.sym_nrepres,intensity->molec.sym_degen);
-	create_and_copy_bset_contr_to_gpu(&intensity->bset_contr[2],&(g_ptrs.bset_contr[1]),intensity->bset_contr[2].ijterms,intensity->molec.sym_nrepres,intensity->molec.sym_degen);
+
+	g_ptrs.avail_mem -= create_and_copy_bset_contr_to_gpu(&intensity->bset_contr[1],&(g_ptrs.bset_contr[0]),intensity->bset_contr[1].ijterms,intensity->molec.sym_nrepres,intensity->molec.sym_degen);
+	g_ptrs.avail_mem -= create_and_copy_bset_contr_to_gpu(&intensity->bset_contr[2],&(g_ptrs.bset_contr[1]),intensity->bset_contr[2].ijterms,intensity->molec.sym_nrepres,intensity->molec.sym_degen);
 
 	printf("Done..");
 	
 	printf("Copying threej...");
 	copy_threej_to_gpu(intensity->threej,&(g_ptrs.threej), jmax);
+	g_ptrs.avail_mem -=(jmax+1)*(jmax+1)*3*3*sizeof(double);
 	printf("done..");
+	
+
+	if(intensity->dip_size > g_ptrs.avail_mem)
+	{
+		printf("Dipole too large to fit into gpu memory, leaving on host gpu_avail = %d dipole_size = %d\n",g_ptrs.avail_mem,intensity->dip_size);
+		if(omp_get_thread_num()==0) intensity->host_dipole=true;
+	}else{
 
 	printf("Copying dipole...");
 	copy_array_to_gpu((void*)intensity->dipole_me,(void**)&(g_ptrs.dipole_me),intensity->dip_size,"dipole_me");
-	printf("Done\n");
 	g_ptrs.avail_mem -=intensity->dip_size;
+	intensity->host_dipole=false;
+	}
+
+	#pragma omp barrier
+	if(intensity->host_dipole && omp_get_thread_num()==0){
+		printf("Copying dipole\n");
+		
+		double* replacement_dipole;
+		printf("Allocing memory....");
+		if(cudaSuccess != cudaMallocHost(&replacement_dipole,intensity->dip_size,cudaHostAllocPortable |  cudaHostAllocMapped | cudaHostAllocWriteCombined)) printf("Could not malloc!!!\n");
+		CheckCudaError("Dipole!");
+		printf("copying....");
+		memcpy(replacement_dipole,intensity->dipole_me,intensity->dip_size);
+		//copy_dipole_host(intensity->dipole_me,&replacement_dipole,intensity->dip_size);
+		printf("Done");
+		//Clear dipole from memory
+		delete[] intensity->dipole_me;
+		//Put new dipole
+		intensity->dipole_me = replacement_dipole;
+	}
+	
+	#pragma omp barrier
+	printf("Left over memory is %d bytes\n",g_ptrs.avail_mem);
+
+	printf("Done\n");
+	
 }
 
 __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int device_id,int num_devices){
@@ -1181,41 +1246,22 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	//Prinf get available cpu memory
 	//unsigned long available_cpu_memory = intensity.cpu_memory;
 	size_t available_gpu_memory = g_ptrs.avail_mem;
-	printf("Available gpu memory = %2.4f GB\n",float(available_gpu_memory)/(1024.0f*1024.0f*1024.0f));
 	//Compute how many inital state vectors and final state vectors
+
 	//unsigned long no_final_states_cpu = ((available_cpu_memory)/8l - long(2*intensity.dimenmax))/(3l*intensity.dimenmax);//(Initial + vec_cor + half_ls)*dimen_max
 	size_t no_final_states_gpu = available_gpu_memory/sizeof(double);
+
 	no_final_states_gpu -=	size_t(intensity.dimenmax)*( 1+ nJ*intensity.molec.sym_maxdegen);
-	no_final_states_gpu /= ( 2l * size_t(intensity.dimenmax) );
-	no_final_states_gpu /=2;
-	printf("%d\n",no_final_states_gpu);
+
+	no_final_states_gpu /= ( 4l * size_t(intensity.dimenmax) );
+
+	//no_final_states_gpu /=2;
+
+	//no_final_states_gpu = 10;
+	//printf("%d\n",no_final_states_gpu);
 	no_final_states_gpu = min((unsigned int )intensity.Neigenlevels,(unsigned int )no_final_states_gpu);
 
-	printf("%d\n",no_final_states_gpu);
-	//printf("Memory=%.f KB\n",float(no_final_states_gpu*sizeof(double))/float(1024));
-	//no_final_states_gpu/=sizeof(double);
 	//printf("%d\n",no_final_states_gpu);
-
-	//exit(0);
-
-
-	//Print out the header
-	// write(out,"(/t4'J',t6'Gamma <-',t17'J',t19'Gamma',t25'Typ',t35'Ei',t42'<-',t50'Ef',t62'nu_if',&
-       //           &t85,<nclasses>(4x),1x,<nmodes>(4x),3x,'<-',14x,<nclasses>(4x),1x,<nmodes>(4x),&
-        //          &8x,'S(f<-i)',10x,'A(if)',12x,'I(f<-i)',12x,'Ni',8x,'Nf',8x,'N')")
-
-
-
-	
-
-
-
-//	exit(0);
-	//half are the eigenvectors, the other half are the correlations
-
-	//printf("No of final states in gpu_memory: %d  cpu memory: %d\n",no_final_states_gpu,no_final_states_cpu);
-
-
 
 	//Half linestrength related variable
 	cudaStream_t* st_half_ls = new cudaStream_t[nJ*intensity.molec.sym_maxdegen]; 	//Concurrently run half_ls computations on this many of the half_ls's
@@ -1232,7 +1278,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	cudaStream_t* st_ddot_vectors = new cudaStream_t[no_final_states_gpu];
 	cudaStream_t intial_f_memcpy;
 	double* final_vectors;
-	cudaMallocHost(&final_vectors,sizeof(double)*intensity.dimenmax*no_final_states_gpu);
+	cudaMallocHost(&final_vectors,sizeof(double)*intensity.dimenmax*no_final_states_gpu, cudaHostAllocWriteCombined);
 	//= new double[intensity.dimenmax*no_final_states_gpu]; //Pin this memory in final build
 	//int* vec_ilevelF = new int[no_final_states_gpu];
 
@@ -1255,24 +1301,39 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	copy_array_to_gpu((void*)initial_vector,(void**)&(gpu_initial_vector),sizeof(double)*intensity.dimenmax,"gpu_initial_vector");
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax;
 
+
 	copy_array_to_gpu((void*)final_vectors,(void**)&(gpu_final_vectors),sizeof(double)*intensity.dimenmax*no_final_states_gpu,"gpu_final_vectors");
-	CheckCudaError("gpu_final_vectors");
+
+
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax*no_final_states_gpu;
+
 	copy_array_to_gpu((void*)final_vectors,(void**)&(gpu_corr_vectors),sizeof(double)*intensity.dimenmax*no_final_states_gpu,"gpu_corr_vectors");
-	CheckCudaError("gpu_corr_vectors");
+
+
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax*no_final_states_gpu;
+
 	copy_array_to_gpu((void*)half_ls,(void**)&(gpu_half_ls),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_half_ls");
+
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen;
-	CheckCudaError("gpu_half_ls");
-	printf("Available gpu memory = %.f Number of states = %d\n",float(available_gpu_memory)/float((1024l*1024l*1024l)),available_gpu_memory);
+
+
+	if(intensity.host_dipole){
+		printf("Device pointer fun!!!");
+		if(cudaSuccess != cudaHostGetDevicePointer((void **)&g_ptrs.dipole_me, (void *)intensity.dipole_me, 0)){
+			printf("Device pointer is not fun :(!!");
+		}
+		printf("\n\n GPU-> Host pointer: %p\n",g_ptrs.dipole_me);
+	}
+
 	//copy_array_to_gpu((void*)line_str,(void**)&(gpu_line_str),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_line_str");
 	//Open the eigenvector units
 	char filename[1024];
 
 	//Get the filename1552 bytes stack frame, 24 bytes spill stores, 24 bytes spill loads
-
 	printf("Open vector units\n");
+
 	FILE** eigenvec_unit = new FILE*[2*intensity.molec.sym_nrepres];
+
 	for(int i =0; i< 2; i++){
 		for(int j = 0; j < intensity.molec.sym_nrepres; j++)
 		{
@@ -1311,7 +1372,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	int last_ilevelF= 0;
 	// Number of threads in each thread block
-    	int blockSize =768;
+    	int blockSize =384;
 
  
     	// Number of thread blocks in grid
@@ -1371,10 +1432,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	      stat = cublasSetVector(intensity.dimenmax, sizeof(double),initial_vector, 1, gpu_initial_vector, 1);
 	      CheckCudaError("Set Vector I");			
 
-
-	      //printf("State J = %i Energy = %11.4f igammaI = %i ilevelI = %i\n",jI,energyI,igammaI,ilevelI);
-
-    	      blockSize =768;
+    	      blockSize =384;
 
  
     	// Number of thread blocks in grid
@@ -1387,7 +1445,8 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 		}
 		//printf("Correlate");		
 	      cudaDeviceSynchronize();
-	      for(int ideg=0; ideg < ndegI; ideg++){
+		CheckCudaError("Correlate");	      
+		for(int ideg=0; ideg < ndegI; ideg++){
 			for(int indF =0; indF < nJ; indF++){
 				//These will execute asychronously
 	     			device_compute_1st_half_ls<<<gridSize,blockSize,0,st_half_ls[indF + ideg*nJ]>>>(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
@@ -1471,9 +1530,12 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 				//Correlate the vectors
 				for(idegF = 0; idegF < ndegF; idegF++){
 					device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[i]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.dimenmax),gpu_corr_vectors + intensity.dimenmax*i);
-					for(idegI=0; idegI < ndegI; idegI++)
+					for(idegI=0; idegI < ndegI; idegI++){
+						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen] = 0.0;
+						cublasSetStream(handle,st_ddot_vectors[i]);
 						cublasDdot (handle, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
 														&line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
+					}
 				}
 			
 			}
@@ -1530,6 +1592,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			      	int * quantaF = intensity.eigen[ilevelF].quanta;
 			      	int * normalF = intensity.eigen[ilevelF].normal;
 				int ndegF   = intensity.eigen[ilevelF].ndeg;
+				cudaStreamSynchronize(st_ddot_vectors[ivec]);
 				double ls=0.0;
 			        for(int idegF=0; idegF < ndegF; idegF++){
 				      for(int idegI=0; idegI < ndegI; idegI++){
@@ -1633,6 +1696,15 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	
 
 	}
+
+	for(int i =0; i< 2; i++){
+		for(int j = 0; j < intensity.molec.sym_nrepres; j++)
+		{
+			fclose(eigenvec_unit[i + j*2]);
+
+		}
+	}
+
 	cudaDeviceReset();
 	cudaFreeHost(&final_vectors);
 

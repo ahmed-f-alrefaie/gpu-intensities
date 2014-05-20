@@ -574,7 +574,7 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 	{
           	icase   = bset_contr.icontr2icase[iroot];
          	ilambda = bset_contr.icontr2icase[iroot + ncases];			
-		jcontr = bset_contr.icontr_correlat_j0[icase + ilambda*ncases];
+		jcontr = bset_contr.icontr_correlat_j0[icase + ilambda*bset_contr.Maxsymcoeffs];
 		bset_contr.iroot_correlat_j0[iroot] = jcontr;
 		
 		ilevel  = bset_contr.contractive_space[icase*(nclasses+1)];
@@ -584,6 +584,10 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
           	tau    = bset_contr.rot_index[ilevel+ideg*ncases].tau;
 		bset_contr.ktau[iroot] = 2*k+tau;
           	bset_contr.k[iroot]    = k;
+		if(bset_contr.iroot_correlat_j0[iroot] >= bset_contrj0.Maxcontracts){
+			printf("Error in root correlats %i %i \n",bset_contr.iroot_correlat_j0[iroot],bset_contrj0.Maxcontracts);
+			exit(0);
+		}
           	#ifndef NDEBUG
           	            printf("iroot = %i ilevel = %i icase = %i ideg=%i ilambda = %i jcontr = %i k = %i, tau = %i\n",iroot,ilevel,icase,ideg,ilambda,jcontr,k,tau);
           	#endif 
