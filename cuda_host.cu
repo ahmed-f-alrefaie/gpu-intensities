@@ -564,7 +564,7 @@ __host__ void dipole_do_intensities(FintensityJob & intensity){
 
 		printf("----------------------------------\n");
 	     for(int indF=0; indF <2; indF++){
-	     	device_compute_1st_half_ls<<<gridSize,blockSize>>>(intensity.g_ptrs.bset_contr[indI],intensity.g_ptrs.bset_contr[indF],intensity.g_ptrs.dipole_me,igammaI,0,gpu_corr_vec,intensity.g_ptrs.threej,gpu_half_ls[indF]);
+	     	device_compute_1st_half_ls<<<gridSize,blockSize>>>(intensity.g_ptrs.bset_contr[indI],intensity.g_ptrs.bset_contr[indF],intensity.g_ptrs.dipole_me,igammaI,gpu_corr_vec,intensity.g_ptrs.threej,gpu_half_ls[indF]);
 			//CheckCudaError("compute half ls I");
 			//cudaDeviceSynchronize();
 			//cublasGetVector(dimenI, sizeof(double),gpu_half_ls[indF], 1, half_ls, 1);
@@ -711,6 +711,19 @@ __host__ void dipole_do_intensities(FintensityJob & intensity){
 		
 	
 }
+
+__host__ void do_1st_half_ls(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream = 0){
+
+		  int blockSize = 64;
+		  int gridSize = gridSize = (int)ceil((float)dimenMax/blockSize);
+
+		  device_correlate_vectors<<<gridSize,blockSize,0,stream>>>(bset_contrI,idegI,igammaI, vecI,vec);
+	     	  device_compute_1st_half_ls_flipped_dipole<<<gridSize,blockSize,0,stream>>>(bset_contrI,bset_contrF,
+								   dipole_me,igammaI,vec,threej,
+								   half_ls);				
+}
+
+
 
 __host__ void dipole_do_intensities_async(FintensityJob & intensity,int device_id){
 	//Prinf get available cpu memory
@@ -877,7 +890,7 @@ __host__ void dipole_do_intensities_async(FintensityJob & intensity,int device_i
 			for(int indF =0; indF < nJ; indF++){
 				//These will execute asychronously
 	     			device_compute_1st_half_ls<<<gridSize,blockSize,0,st_half_ls[indF + ideg*nJ]>>>(intensity.g_ptrs.bset_contr[indI],intensity.g_ptrs.bset_contr[indF],
-								   intensity.g_ptrs.dipole_me,igammaI,ideg,gpu_corr_vectors + intensity.dimenmax*ideg,intensity.g_ptrs.threej,
+								   intensity.g_ptrs.dipole_me,igammaI,gpu_corr_vectors + intensity.dimenmax*ideg,intensity.g_ptrs.threej,
 								   gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ);				
 			}
 
@@ -1114,10 +1127,11 @@ __host__ void dipole_initialise_cpu(FintensityJob* intensity){
 	correlate_index(intensity->bset_contr[0],intensity->bset_contr[0]);
 	correlate_index(intensity->bset_contr[0],intensity->bset_contr[1]);
 	correlate_index(intensity->bset_contr[0],intensity->bset_contr[2]);
+
 	
 	printf("Reading dipole\n");
 	//Read the dipole
-	read_dipole(intensity->bset_contr[0],&(intensity->dipole_me),intensity->dip_size);
+	read_dipole_flipped(intensity->bset_contr[0],&(intensity->dipole_me),intensity->dip_size);
 	printf("Computing threej\n");
 	//Compute threej
 	precompute_threej(&(intensity->threej),jmax);
@@ -1158,7 +1172,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
         cudaGetDeviceProperties(&devProp, device_id);
 	g_ptrs.avail_mem = size_t(double(devProp.totalGlobalMem)*0.95);
 	printf("Available gpu memory = %2.4f GB",float(g_ptrs.avail_mem)/(1024.0f*1024.0f*1024.0f));
-	printf("Total global memory:           %u\n",  devProp.totalGlobalMem);
+	printf("Total global memory:           %zu\n",  devProp.totalGlobalMem);
 	//Begin GPU related initalisation////////////////////////////////////////////////////////
 	intensity_info int_gpu;
 	//Copy over constants to GPU
@@ -1193,7 +1207,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 
 	if(intensity->dip_size > g_ptrs.avail_mem)
 	{
-		printf("Dipole too large to fit into gpu memory, leaving on host gpu_avail = %d dipole_size = %d\n",g_ptrs.avail_mem,intensity->dip_size);
+		printf("Dipole too large to fit into gpu memory, leaving on host gpu_avail = %zu dipole_size = %zu\n",g_ptrs.avail_mem,intensity->dip_size);
 		if(omp_get_thread_num()==0) intensity->host_dipole=true;
 	}else{
 
@@ -1222,7 +1236,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 	}
 	
 	#pragma omp barrier
-	printf("Left over memory is %d bytes\n",g_ptrs.avail_mem);
+	printf("Left over memory is %zu bytes\n",g_ptrs.avail_mem);
 
 	printf("Done\n");
 	
@@ -1236,8 +1250,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	//printf("Wake up gpu\n");
 	cudaFree(0);
 	//printf("....Done!\n");
-
-
+	int current_stream = 0;
 
 	int nJ = 2;
 	//Setup the gpu pointers
@@ -1253,15 +1266,15 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	no_final_states_gpu -=	size_t(intensity.dimenmax)*( 1+ nJ*intensity.molec.sym_maxdegen);
 
-	no_final_states_gpu /= ( 4l * size_t(intensity.dimenmax) );
+	no_final_states_gpu /= ( 2l * size_t(intensity.dimenmax) );
 
 	//no_final_states_gpu /=2;
 
 	//no_final_states_gpu = 10;
-	//printf("%d\n",no_final_states_gpu);
+	printf("%zu\n",no_final_states_gpu);
 	no_final_states_gpu = min((unsigned int )intensity.Neigenlevels,(unsigned int )no_final_states_gpu);
 
-	//printf("%d\n",no_final_states_gpu);
+	printf("%d\n",no_final_states_gpu);
 
 	//Half linestrength related variable
 	cudaStream_t* st_half_ls = new cudaStream_t[nJ*intensity.molec.sym_maxdegen]; 	//Concurrently run half_ls computations on this many of the half_ls's
@@ -1275,7 +1288,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	//Final vectors
 	//Streams for each final vector computation
-	cudaStream_t* st_ddot_vectors = new cudaStream_t[no_final_states_gpu];
+	cudaStream_t st_ddot_vectors[16]; //= new cudaStream_t[no_final_states_gpu];
 	cudaStream_t intial_f_memcpy;
 	double* final_vectors;
 	cudaMallocHost(&final_vectors,sizeof(double)*intensity.dimenmax*no_final_states_gpu, cudaHostAllocWriteCombined);
@@ -1297,26 +1310,32 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	int ilevel_total=0;
 	int ilevelF=0,start_ilevelF=0;
 
+	printf("Finished host side allocation\n");
+	
+	printf("Copying intial vectors\n");
 	//Copy them to the gpu
 	copy_array_to_gpu((void*)initial_vector,(void**)&(gpu_initial_vector),sizeof(double)*intensity.dimenmax,"gpu_initial_vector");
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax;
 
-
+	printf("Copying final vectors\n");
 	copy_array_to_gpu((void*)final_vectors,(void**)&(gpu_final_vectors),sizeof(double)*intensity.dimenmax*no_final_states_gpu,"gpu_final_vectors");
 
 
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax*no_final_states_gpu;
-
+	printf("Copying correlation vectors\n");
 	copy_array_to_gpu((void*)final_vectors,(void**)&(gpu_corr_vectors),sizeof(double)*intensity.dimenmax*no_final_states_gpu,"gpu_corr_vectors");
 
 
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax*no_final_states_gpu;
-
+	printf("Copying correlation vectors\n");
 	copy_array_to_gpu((void*)half_ls,(void**)&(gpu_half_ls),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_half_ls");
 
 	available_gpu_memory -= sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen;
+	printf("Copying line strength vectors\n");
+	//copy_array_to_gpu((void*)line_str,(void**)&(gpu_line_str),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_line_str");
 
 
+	//A HACK to host the dipole in CPU memory, will slow stuff down considerably
 	if(intensity.host_dipole){
 		printf("Device pointer fun!!!");
 		if(cudaSuccess != cudaHostGetDevicePointer((void **)&g_ptrs.dipole_me, (void *)intensity.dipole_me, 0)){
@@ -1324,8 +1343,8 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 		}
 		printf("\n\n GPU-> Host pointer: %p\n",g_ptrs.dipole_me);
 	}
-
-	//copy_array_to_gpu((void*)line_str,(void**)&(gpu_line_str),sizeof(double)*intensity.dimenmax*nJ*intensity.molec.sym_maxdegen,"gpu_line_str");
+	printf("Finished gpu copying\n");
+	//
 	//Open the eigenvector units
 	char filename[1024];
 
@@ -1337,7 +1356,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	for(int i =0; i< 2; i++){
 		for(int j = 0; j < intensity.molec.sym_nrepres; j++)
 		{
-
+			if(intensity.isym_do[j] == false) continue;
 			sprintf(filename,j0eigen_vector_gamma_filebase,intensity.jvals[i],j+1);
 			printf("Reading %s\n",filename);
 			eigenvec_unit[i + j*2] = fopen(filename,"r");
@@ -1366,27 +1385,13 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	//Final states
 	cudaStreamCreate(&intial_f_memcpy);
-	for(int i = 0; i < no_final_states_gpu; i++)
+	for(int i = 0; i < 16; i++)
 		cudaStreamCreate(&st_ddot_vectors[i]);
 
 
 	int last_ilevelF= 0;
-	// Number of threads in each thread block
-    	int blockSize =384;
-
- 
-    	// Number of thread blocks in grid
-    	int gridSize = (int)ceil((float)intensity.dimenmax/blockSize);
-	
-
 	//////Begin the computation//////////////////////////////////////////////////////////////////////////////
 	CheckCudaError("Initialisation");
-
-//(/t4'J',t6'Gamma <-',t17'J',t19'Gamma',t25'Typ',t35'Ef',t42'<-',t50'Ei',t62'nu_if',&
-//                   &t85,<nclasses>(4x),1x,<nmodes>(4x),3x,'<-',14x,<nclasses>(4x),1x,<nmodes>(4x),&
-//                   &8x,'S(f<-i)',10x,'A(if)',12x,'I(f<-i)',12x,'Ni',8x,'Nf',8x,'N')"
-
-	//printf("Nu_if\tJf Kf quantaF\t <-- \tJI KI tauI quantaI\t Ein_A\tLine_str\n");
 
 	//If zero then itll progress normally otherwise with 4 devices it will go like this
 	//Thread 0 = 0 4 8 12
@@ -1430,28 +1435,20 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	      fread(initial_vector,sizeof(double),nsizeI,unitI);
 
 	      stat = cublasSetVector(intensity.dimenmax, sizeof(double),initial_vector, 1, gpu_initial_vector, 1);
+
 	      CheckCudaError("Set Vector I");			
-
-    	      blockSize =384;
-
- 
-    	// Number of thread blocks in grid
-    	      gridSize = (int)ceil((float)dimenI/blockSize);
-              //We have the vector now we compute the half_ls Asynchronously
+   		//Do first half ls
 	      for(int ideg=0; ideg < ndegI; ideg++){
-			//printf("ideg=%i ndegI=%i\n",ideg,ndegI);
-			device_correlate_vectors<<<gridSize,blockSize,0,st_half_ls[ideg]>>>(g_ptrs.bset_contr[indI],ideg,igammaI, gpu_initial_vector,gpu_corr_vectors + intensity.dimenmax*ideg); //This will have priority
-	      
-		}
-		//printf("Correlate");		
-	      cudaDeviceSynchronize();
-		CheckCudaError("Correlate");	      
-		for(int ideg=0; ideg < ndegI; ideg++){
 			for(int indF =0; indF < nJ; indF++){
-				//These will execute asychronously
-	     			device_compute_1st_half_ls<<<gridSize,blockSize,0,st_half_ls[indF + ideg*nJ]>>>(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
-								   g_ptrs.dipole_me,igammaI,ideg,gpu_corr_vectors + intensity.dimenmax*ideg,g_ptrs.threej,
-								   gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ);				
+				do_1st_half_ls(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
+						intensity.dimenmax,ideg,igammaI,g_ptrs.dipole_me,gpu_initial_vector,gpu_corr_vectors + intensity.dimenmax*ideg,
+										g_ptrs.threej,
+											gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ
+												,st_half_ls[ideg]);
+				//gridSize = (int)ceil((float)intensity.bset_contr[indF+1].Maxcontracts/blockSize);
+	     			//device_compute_1st_half_ls_flipped_dipole<<<gridSize,blockSize,0,st_half_ls[indF + ideg*nJ]>>>(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
+							  // g_ptrs.dipole_me,igammaI,gpu_corr_vectors + intensity.dimenmax*ideg,g_ptrs.threej,
+								//   gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ);				
 			}
 
 			 //wait for the next batch
@@ -1459,10 +1456,9 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	      }
 
 
-				vector_idx=0;
+		vector_idx=0;	
 		ilevelF=0;
 		int current_buff = 0;
-		//printf("First half_ls");
 		//While the half_ls is being computed, lets load up some final state vectors
 		while(vector_idx < no_final_states_gpu && ilevelF < intensity.Neigenlevels)
 		{
@@ -1521,14 +1517,17 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			      	int * quantaF = intensity.eigen[ilevelF].quanta;
 			      	int * normalF = intensity.eigen[ilevelF].normal;
 			     	 int nsizeF = intensity.bset_contr[indF+1].nsize[igammaF];
-				int irec = intensity.eigen[ilevelF].irec[0]-1;
+				//int irec = intensity.eigen[ilevelF].irec[0]-1;
 				int dimenF = intensity.bset_contr[indF+1].Maxcontracts;
 				int ndegF   = intensity.eigen[ilevelF].ndeg;
 				int idegF = 0;
 				int idegI = 0;
+				int blockSize =512;
+				int gridSize = (int)ceil((float)intensity.dimenmax/blockSize);
 				//for(int i = 0; i < ndeg
 				//Correlate the vectors
 				for(idegF = 0; idegF < ndegF; idegF++){
+					gridSize = (int)ceil((float)dimenF/blockSize);
 					device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[i]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.dimenmax),gpu_corr_vectors + intensity.dimenmax*i);
 					for(idegI=0; idegI < ndegI; idegI++){
 						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen] = 0.0;
@@ -1678,20 +1677,14 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 			   }
 
 
-			}			 
+			}			
+			//return; 
 			ilevelF=last_ilevelF+1;
 			//Save the new vector_count
 			vector_count = vector_idx;
-			//printf("Vector_count=%i, ilevelF=%i!\n",vector_count,ilevelF);
-			//Copy the bunch of new vectors to the gpu
-			
-			//printf("Done!\n");
 			CheckCudaError("Compute final vectors");
 			cudaDeviceSynchronize();
 		}
-		//cudaDeviceReset();
-		//cudaDeviceSynchronize();
-		//exit(0);
 		
 	
 

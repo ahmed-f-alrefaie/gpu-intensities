@@ -8,6 +8,7 @@
 #pragma once
 
 void read_dipole(TO_bset_contrT & bsetj0,double** dipole_me,size_t & dip_size);
+void read_dipole_flipped(TO_bset_contrT & bsetj0,double** dipole_me,size_t & dip_size);
 double fakt(double a);
 double three_j(int j1,int j2,int j3,int k1,int k2,int k3);
 void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int sym_nrepres);

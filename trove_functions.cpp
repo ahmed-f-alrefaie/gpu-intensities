@@ -70,7 +70,6 @@ void read_dipole(TO_bset_contrT & bsetj0,double** dipole_me,size_t & dip_size)
 	rootsize  = ncontr_t*(ncontr_t+1)/2;
    	rootsize2 = ncontr_t*ncontr_t;
 	matsize = rootsize2*3;
-	double* temp_dipole = new double[rootsize2];
 	(*dipole_me) = new double[matsize];
 	
 	for(int i = 0 ; i< 3; i++)
@@ -109,6 +108,104 @@ void read_dipole(TO_bset_contrT & bsetj0,double** dipole_me,size_t & dip_size)
 	
 	
 }
+
+
+void read_dipole_flipped(TO_bset_contrT & bsetj0,double** dipole_me,size_t & dip_size)
+{
+	char buff[20];
+	int imu,imu_t;
+	int ncontr_t;
+   	size_t matsize,rootsize,rootsize_t,rootsize2;
+   	
+	FILE* extF = fopen(extFmat_file,"r");
+	
+	if(extF == NULL)
+	{
+		printf("[read_dipole] Error: checkpoint file of name %s not found",extFmat_file);
+		fprintf(stderr,"[read_dipole] Error: checkpoint file not found");
+		exit(0);
+	}
+	
+	ReadFortranRecord(extF, buff);
+	
+	if(memcmp(buff,"Start external field",20) != 0)
+	{
+		printf("[read_dipole] Error: checkpoint file of name %s has bogus header %s",extFmat_file,buff);
+		fprintf(stderr,"[read_dipole] bogus header");
+		exit(0);
+	}
+	
+	ReadFortranRecord(extF, &ncontr_t);
+	
+	//Check basis size here//
+	//printf("ncontr_t = %i ",ncontr_t);
+	if(ncontr_t != bsetj0.Maxcontracts)
+	{
+			printf("[read_dipole] Actual and stored basis sizes at J=0 do not agree  %i /= %i",bsetj0.Maxcontracts,ncontr_t);
+			fprintf(stderr,"[read_dipole] Actual and stored basis sizes at J=0 do not agree");
+			exit(0);
+	}
+	
+	
+	
+	/////////////////////////
+	
+	rootsize  = ncontr_t*(ncontr_t+1)/2;
+   	rootsize2 = ncontr_t*ncontr_t;
+	matsize = rootsize2*3;
+	double* temp_dipole = new double[matsize];
+	(*dipole_me) = new double[matsize];
+	
+	for(int i = 0 ; i< 3; i++)
+	{
+		ReadFortranRecord(extF, &imu_t);
+		if(imu_t != (i+1))
+		{
+			printf("[read_dipole] has bogus imu - restore_vib_matrix_elements: %i /= %i",imu_t,(i+1));
+			fprintf(stderr,"[read_dipole] bogus imu");
+			exit(0);
+		}
+		
+		ReadFortranRecord(extF, (temp_dipole) + i*rootsize2);
+				
+			 
+	}
+		
+	ReadFortranRecord(extF, buff);		 
+		if(memcmp(buff,"End external field",18) != 0)
+	{
+		printf("[read_dipole] Error: checkpoint file of name %s has bogus footer %s",extFmat_file,buff);
+		fprintf(stderr,"[read_dipole] bogus footer");
+		exit(0);
+	}
+	
+	fclose(extF);
+
+	#ifndef NDEBUG
+	//for(int i = 0; i < ncontr_t; i++)
+//		for(int j = 0; j < ncontr_t; j++)//
+			//for(int k = 0; k < 3; k++)
+		//		printf("dipole[%i,%i,%i] = %16.8e\n",i,j,k,(*dipole_me)[i + j*ncontr_t + k*ncontr_t*ncontr_t]);
+	//exit(0);
+	#endif
+	dip_size = sizeof(double)*matsize;
+	printf("Flipping dipole........");
+	for(int i = 0; i < ncontr_t; i++)
+		for(int f = 0; f < ncontr_t; f++)
+			for(int k = 0; k < 3; k++)
+				(*dipole_me)[f + i*ncontr_t + k*ncontr_t*ncontr_t] = temp_dipole[i + f*ncontr_t + k*ncontr_t*ncontr_t];
+
+
+
+
+	delete[] temp_dipole;
+	printf("done!\n");
+	
+	
+}
+
+
+
 
 //Ported trove's fakt function [moltype.f90] 
 double fakt(double a)
@@ -591,6 +688,8 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
           	#ifndef NDEBUG
           	            printf("iroot = %i ilevel = %i icase = %i ideg=%i ilambda = %i jcontr = %i k = %i, tau = %i\n",iroot,ilevel,icase,ideg,ilambda,jcontr,k,tau);
           	#endif 
+		//printf("iroot = %i ilevel = %i icase = %i ideg=%i ilambda = %i jcontr = %i k = %i, tau = %i\n",iroot,ilevel,icase,ideg,ilambda,jcontr,k,tau);
+		//printf("iroot = %i j0root = %i\n",iroot,jcontr);
           	
          }
 	delete[] cnu_j;

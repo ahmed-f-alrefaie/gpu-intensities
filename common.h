@@ -1,3 +1,6 @@
+
+#include <sys/time.h>
+#include <ctime>
 #pragma once
 //#define NDEBUG
 typedef unsigned int uint;
@@ -11,6 +14,7 @@ extern const char* j0eigen_filebase;
 extern const char* j0eigen_quanta_filebase;
 extern const char* j0eigen_vector_gamma_filebase;
 extern const char* j0eigen_descr_gamma_filebase;
+
 /*
 void verbose_printf(int verbose,const char* fmt, ...){
 	//

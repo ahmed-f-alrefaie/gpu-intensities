@@ -20,7 +20,7 @@ INC = -I$(CUDA_HOME)/include
 
 ###############################################################################
 
-OBJ = trove_functions.o Util.o cuda_host.o dipole_kernals.o fields.o
+OBJ = trove_functions.o Util.o cuda_host.o dipole_kernals.o fields.o test.o
 #input.o
 
 main.x:    main.o  $(OBJ) 
@@ -40,10 +40,12 @@ fields.o:  fields.cpp
 
 
 dipole_kernals.o:  dipole_kernals.cu
-	$(NVCC) -c dipole_kernals.cu $(NVCCFLAGS)
+	$(NVCC) -c dipole_kernals.cu $(NVCCFLAGS) --maxrregcount 70
 
 cuda_host.o:  cuda_host.cu
 	$(NVCC) -c cuda_host.cu $(NVCCFLAGS) -Xcompiler -fopenmp
+test.o:  test.cu Util.o trove_functions.o
+	$(NVCC) -c test.cu $(NVCCFLAGS)
 #input.o:  input.f90
 #       $(FOR) -c input.f90 $(FFLAGS)
 
