@@ -154,7 +154,9 @@ void read_intensities(FintensityJob* intensity)
 					if(intensity->gns[i] <=0.00000001){
 						intensity->isym_do[i]=false;
 					}
+					//printf("GNS=%.f\n",intensity->gns[i]);
 				}
+				//exit(0);
 			}
 			else if(strcmp("SELECTION",line_ptr)==0){
 				for(int i = 0; i < intensity->molec.sym_nrepres; i++)

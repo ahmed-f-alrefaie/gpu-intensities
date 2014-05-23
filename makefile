@@ -10,7 +10,7 @@ checkin:
 PLAT =
 NVCC = nvcc
 FOR = icc
-NVCCFLAGS := --ptxas-options=-v -O3 -gencode arch=compute_20,code=sm_20 -Xptxas -v
+NVCCFLAGS := --ptxas-options=-v -O3 -gencode arch=compute_20,code=sm_20 -Xptxas -v -lineinfo
 FFLAGS = -O3 -g -cxxlib -debug -openmp -traceback
 #-O3 -ipo -xHost -g -traceback
 CUDADIR = /shared/ucl/apps/cuda/4.0
@@ -40,7 +40,7 @@ fields.o:  fields.cpp
 
 
 dipole_kernals.o:  dipole_kernals.cu
-	$(NVCC) -c dipole_kernals.cu $(NVCCFLAGS) --maxrregcount 70
+	$(NVCC) -c dipole_kernals.cu $(NVCCFLAGS) 
 
 cuda_host.o:  cuda_host.cu
 	$(NVCC) -c cuda_host.cu $(NVCCFLAGS) -Xcompiler -fopenmp

@@ -431,11 +431,12 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
 	
 	//read(iounit, '(2i8)') ncases, nlambdas
 	getline(eig_qu,line);
-	ncases = strtol(line.c_str(),&line_ptr,0);
-	nlambdas = strtol(line_ptr,&line_ptr,0);
+	bset_contr->ncases = ncases = strtol(line.c_str(),&line_ptr,0);
+	bset_contr->nlambdas =nlambdas = strtol(line_ptr,&line_ptr,0);
 	
 	//allocate(bset_contr(jind)%rot_index(ncases, nlambdas), stat = info) 
 	bset_contr->rot_index=new TO_PTrotquantaT[ncases*nlambdas];
+	printf("j= %i rot_index size =%i,ncases=%i, nlambdas = %i\n",jval,ncases*nlambdas,ncases,nlambdas); 
 	int icase,ilambda;
 	while(getline(eig_qu,line))
 	{
@@ -572,11 +573,12 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 	//allocate(cnu_i(1:nclasses),cnu_j(1:nclasses),stat = info)
 	cnu_i = new int[nclasses];
 	cnu_j = new int[nclasses];
-	//printf("Maxsymj0 = %i %i\n",bset_contrj0.Maxsymcoeffs,	bset_contrj0.max_deg_size);
-	//printf("Maxsym = %i %i\n",bset_contr.Maxsymcoeffs,bset_contr.max_deg_size);
+	printf("Maxsymj0 = %i %i %i\n",bset_contrj0.Maxcontracts,bset_contrj0.Maxsymcoeffs,	bset_contrj0.max_deg_size);
+	printf("Maxsym = %i %i %i\n",bset_contr.Maxcontracts,bset_contr.Maxsymcoeffs,bset_contr.max_deg_size);
 
 	//allocate(bset_contr(jind)%icontr_correlat_j0(bset_contr(jind)%Maxsymcoeffs,bset_contr(jind)%max_deg_size), stat = info)
 	bset_contr.icontr_correlat_j0 = new int[bset_contr.Maxsymcoeffs*bset_contr.max_deg_size];
+	//printf("Do I root correlate\n");
 	//printf("Start_correlation\n");
 	//bool contract_space;
 	//bool index_deg;
@@ -637,15 +639,18 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
             // bset_contr(jind)%icontr_correlat_j0(icase, ilambda) = jcontr
 		}//ilambda
 	}//icase
-	//printf("Finished correlation");
+	//printf("Finished correlation\n");
 //	       allocate(bset_contr(jind)%iroot_correlat_j0(bset_contr(jind)%Maxcontracts), stat = info)
 //       call ArrayStart('bset_contr',info,size(bset_contr(jind)%iroot_correlat_j0),kind(bset_contr(jind)%iroot_correlat_j0))
 //       allocate(bset_contr(jind)%ktau(bset_contr(jind)%Maxcontracts), stat = info)
 //       call ArrayStart('bset_contr',info,size(bset_contr(jind)%ktau),kind(bset_contr(jind)%ktau))
 //       allocate(bset_contr(jind)%k(bset_contr(jind)%Maxcontracts), stat = info)
 //       call ArrayStart('bset_contr',info,size(bset_contr(jind)%k),kind(bset_contr(jind)%k))
-	bset_contr.iroot_correlat_j0 = new int[bset_contr.Maxcontracts];	
+	//printf("Allocate iroot j0\n");
+	bset_contr.iroot_correlat_j0 = new int[bset_contr.Maxcontracts];
+	//printf("Allocate ktau\n");	
 	bset_contr.ktau = new int[bset_contr.Maxcontracts];
+	//printf("Allocate k\n");
 	bset_contr.k = new int[bset_contr.Maxcontracts];
 	
 /*	       do iroot = 1, bset_contr(jind)%Maxcontracts
@@ -666,19 +671,30 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
           bset_contr(jind)%ktau(iroot) = 2*k+tau
           bset_contr(jind)%k(iroot)    = k
 */
-	int ncases = bset_contr.Maxcontracts;
+	int ncases = bset_contr.ncases;
+	int ncontr = bset_contr.Maxcontracts;
+	//printf("Doing k j zero stuf ncases = %i nlambda=%i\n",ncases,bset_contr.max_deg_size);
 	for(int iroot = 0; iroot < bset_contr.Maxcontracts; iroot++)
 	{
+		//if(bset_contr.jval==23&&iroot > 14346) printf("Reached beginning\n");
           	icase   = bset_contr.icontr2icase[iroot];
-         	ilambda = bset_contr.icontr2icase[iroot + ncases];			
+		//if(bset_contr.jval==23&&iroot > 14346) printf("icase =%i\n",icase);
+         	ilambda = bset_contr.icontr2icase[iroot + ncontr];
+		//if(bset_contr.jval==23&&iroot > 14346) printf("ilambda =%i\n",ilambda);			
 		jcontr = bset_contr.icontr_correlat_j0[icase + ilambda*bset_contr.Maxsymcoeffs];
+		//if(bset_contr.jval==23&&iroot > 14346) printf("jcontr =%i\n",jcontr);
 		bset_contr.iroot_correlat_j0[iroot] = jcontr;
-		
+		//if(bset_contr.jval==23&&iroot > 14346) printf("done\n");
+
 		ilevel  = bset_contr.contractive_space[icase*(nclasses+1)];
+		//if(bset_contr.jval==23&&iroot > 14346) printf("ilevel = %i\n",ilevel);
 		ideg    = bset_contr.index_deg[icase].icoeffs[(nclasses+1)*ilambda];
-		
+		//if(bset_contr.jval==23&&iroot > 14346) printf("ideg = %i\n",ideg);
+		//if(bset_contr.jval==23&&iroot > 14346) printf("rot parts\n");
 		k      = bset_contr.rot_index[ilevel+ideg*ncases].k;
+		//if(bset_contr.jval==23&&iroot > 14346) printf("k = %i\n",k);
           	tau    = bset_contr.rot_index[ilevel+ideg*ncases].tau;
+		//if(bset_contr.jval==23&&iroot > 14346) printf("tau=%i\n",tau);
 		bset_contr.ktau[iroot] = 2*k+tau;
           	bset_contr.k[iroot]    = k;
 		if(bset_contr.iroot_correlat_j0[iroot] >= bset_contrj0.Maxcontracts){
@@ -686,14 +702,16 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 			exit(0);
 		}
           	#ifndef NDEBUG
-          	            printf("iroot = %i ilevel = %i icase = %i ideg=%i ilambda = %i jcontr = %i k = %i, tau = %i\n",iroot,ilevel,icase,ideg,ilambda,jcontr,k,tau);
+          	 printf("iroot = %i ilevel = %i icase = %i ideg=%i ilambda = %i jcontr = %i k = %i, tau = %i\n",iroot,ilevel,icase,ideg,ilambda,jcontr,k,tau); fflush(0);
           	#endif 
 		//printf("iroot = %i ilevel = %i icase = %i ideg=%i ilambda = %i jcontr = %i k = %i, tau = %i\n",iroot,ilevel,icase,ideg,ilambda,jcontr,k,tau);
 		//printf("iroot = %i j0root = %i\n",iroot,jcontr);
           	
          }
+	printf("Cleaning up\n");
 	delete[] cnu_j;
 	delete[] cnu_i;
+	printf("done\n");
 	
 }	
 
@@ -886,7 +904,7 @@ void find_igamma_pair(FintensityJob & intensity)
 	{
 		ngamma=0;
 		intensity.igamma_pair[igammaI] = igammaI;
-
+		printf("igammaI = %i sym_nrepres = %i\n",igammaI,intensity.molec.sym_nrepres);
 		for(int igammaF = 0; igammaF < intensity.molec.sym_nrepres; igammaF++)
 		{
 			if(igammaI!=igammaF && intensity.isym_pairs[igammaI]==intensity.isym_pairs[igammaF])
@@ -971,6 +989,7 @@ void read_eigenvalues(FintensityJob & job){
 	{
 		for(int gamma = 0; gamma < job.molec.sym_nrepres; gamma++)
 		{
+			if(!job.isym_do[gamma]) continue;
 			jVal = job.jvals[i]; 
 			//get the filename;
 			sprintf(filename,j0eigen_descr_gamma_filebase,jVal,(gamma+1));
@@ -1124,7 +1143,7 @@ void read_eigenvalues(FintensityJob & job){
 		jVal = job.jvals[jind];
 		for(int gamma = 0; gamma < job.molec.sym_nrepres; gamma++)
 		{
-
+			if(!job.isym_do[gamma]) continue;
 			//get the filename;
 			sprintf(filename,j0eigen_descr_gamma_filebase,jVal,(gamma+1));
 			ifstream descr_file(filename);

@@ -67,6 +67,8 @@ struct TO_bset_contrT
     int* Ntotal;
     int mat_size;
     int* ijterms;
+    int ncases;
+    int nlambdas;
 };
 
 struct TO_PTeigen{

@@ -374,21 +374,27 @@ __host__ void dipole_initialise(FintensityJob* intensity){
 		
 	//Read eigenvalues
 	read_eigenvalues((*intensity));
-
+	unsigned int dimenmax = 0;
+	unsigned int nsizemax = 0;
 	intensity->dimenmax = 0;
 	intensity->nsizemax = 0;
 	//Find nsize
 	for(int i =0; i < intensity->molec.sym_nrepres; i++){
 		if(intensity->isym_do[i]){
-			intensity->nsizemax= max(intensity->bset_contr[1].nsize[i],intensity->nsizemax);
-			intensity->nsizemax = max(intensity->bset_contr[2].nsize[i],intensity->nsizemax);
+			nsizemax= max(intensity->bset_contr[1].nsize[i],nsizemax);
+			nsizemax = max(intensity->bset_contr[2].nsize[i],nsizemax);
 		}
 	}
 
-	printf("Biggest vector dimensiton is %i \n",intensity->nsizemax);
-	intensity->dimenmax = max(intensity->bset_contr[1].Maxcontracts,intensity->dimenmax);
-	intensity->dimenmax = max(intensity->bset_contr[2].Maxcontracts,intensity->dimenmax);
-	printf("Biggest max contraction is is %i \n",intensity->dimenmax);
+	printf("Biggest vector dimensiton is %u \n",nsizemax);
+	for(int i = 0; i < 3; i++){
+		printf("dimenmax = %u J=%i Maxcontracts =%i\n",dimenmax,intensity->bset_contr[i].jval,intensity->bset_contr[i].Maxcontracts);
+		dimenmax = max(intensity->bset_contr[i].Maxcontracts,dimenmax);
+	}
+	//intensity->dimenmax = max(intensity->bset_contr[2].Maxcontracts,intensity->dimenmax);
+	printf("Biggest max contraction is is %u \n",dimenmax);
+	intensity->dimenmax = dimenmax;
+	intensity->nsizemax - nsizemax;
 	printf("Find igamma pairs\n");
 	find_igamma_pair((*intensity));
 	printf("done!\n");
@@ -396,7 +402,7 @@ __host__ void dipole_initialise(FintensityJob* intensity){
 	intensity_info int_gpu;
 	//Copy over constants to GPU
 	int_gpu.sym_nrepres = intensity->molec.sym_nrepres;
-	int_gpu.jmax = jmax;
+	int_gpu.jmax = jmax+1;
 	int_gpu.dip_stride_1 = intensity->bset_contr[0].Maxcontracts;
 	int_gpu.dip_stride_2 = intensity->bset_contr[0].Maxcontracts*intensity->bset_contr[0].Maxcontracts;
 	int_gpu.dimenmax = intensity->dimenmax;
@@ -714,16 +720,33 @@ __host__ void dipole_do_intensities(FintensityJob & intensity){
 
 __host__ void do_1st_half_ls(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream = 0){
 
-		  int blockSize = 64;
+		  int blockSize = 512;
 		  int gridSize = gridSize = (int)ceil((float)dimenMax/blockSize);
-
+		
 		  device_correlate_vectors<<<gridSize,blockSize,0,stream>>>(bset_contrI,idegI,igammaI, vecI,vec);
-	     	  device_compute_1st_half_ls_flipped_dipole<<<gridSize,blockSize,0,stream>>>(bset_contrI,bset_contrF,
-								   dipole_me,igammaI,vec,threej,
+		  blockSize = 128;
+		  int numSMs;
+		  cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+		  
+	     	  device_compute_1st_half_ls_flipped_dipole<<<numSMs*16,blockSize,0,stream>>>(bset_contrI,bset_contrF,
+								   dipole_me,vec,threej,
 								   half_ls);				
 }
 
+__host__ void do_1st_half_ls_branch(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream = 0){
 
+		  int blockSize = 512;
+		  int gridSize = gridSize = (int)ceil((float)dimenMax/blockSize);
+		
+		  device_correlate_vectors<<<gridSize,blockSize,0,stream>>>(bset_contrI,idegI,igammaI, vecI,vec);
+		  blockSize = 256;
+		  int numSMs;
+		  cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+		  
+	     	  device_compute_1st_half_ls_flipped_dipole_branch<<<numSMs/2,blockSize,0,stream>>>(bset_contrI,bset_contrF,
+								   dipole_me,vec,threej,
+								   half_ls);				
+}
 
 __host__ void dipole_do_intensities_async(FintensityJob & intensity,int device_id){
 	//Prinf get available cpu memory
@@ -1266,7 +1289,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	no_final_states_gpu -=	size_t(intensity.dimenmax)*( 1+ nJ*intensity.molec.sym_maxdegen);
 
-	no_final_states_gpu /= ( 2l * size_t(intensity.dimenmax) );
+	no_final_states_gpu /= ( 3l * size_t(intensity.dimenmax) );
 
 	//no_final_states_gpu /=2;
 
@@ -1288,7 +1311,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	//Final vectors
 	//Streams for each final vector computation
-	cudaStream_t st_ddot_vectors[16]; //= new cudaStream_t[no_final_states_gpu];
+	cudaStream_t* st_ddot_vectors = new cudaStream_t[no_final_states_gpu];
 	cudaStream_t intial_f_memcpy;
 	double* final_vectors;
 	cudaMallocHost(&final_vectors,sizeof(double)*intensity.dimenmax*no_final_states_gpu, cudaHostAllocWriteCombined);
@@ -1385,7 +1408,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	//Final states
 	cudaStreamCreate(&intial_f_memcpy);
-	for(int i = 0; i < 16; i++)
+	for(int i = 0; i < no_final_states_gpu; i++)
 		cudaStreamCreate(&st_ddot_vectors[i]);
 
 
@@ -1690,10 +1713,13 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	}
 
-	for(int i =0; i< 2; i++){
+//	printf("Thread =%i done",device_id);
+	for(int i=0; i< 2; i++){
 		for(int j = 0; j < intensity.molec.sym_nrepres; j++)
 		{
-			fclose(eigenvec_unit[i + j*2]);
+			if(!intensity.isym_do[j]) continue;
+			if(eigenvec_unit[i + j*2]!=NULL)
+				fclose(eigenvec_unit[i + j*2]);
 
 		}
 	}

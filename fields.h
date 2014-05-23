@@ -46,9 +46,9 @@ struct FintensityJob{
 	double* threej;
 	FGPU_ptrs g_ptrs;
 	int* igamma_pair;
-	int dimenmax;
+	unsigned int dimenmax;
 	double thresh_linestrength;
-	int nsizemax;
+	unsigned int nsizemax;
 	int** quanta_lower;
 	int** quanta_upper;
 	bool host_dipole;

@@ -15,15 +15,15 @@ __host__ void benchmark_half_ls(FintensityJob & intensity,int no_initial_states)
 	printf("%p\n",gpu_initial_vec);
 
 
-	double* corr_vec = new double[intensity.dimenmax];
+	double* corr_vec = new double[intensity.dimenmax*2*intensity.molec.sym_maxdegen];
 	double* gpu_corr_vec=NULL;
 
-	copy_array_to_gpu((void*)corr_vec,(void**)&(gpu_corr_vec),sizeof(double)*intensity.dimenmax,"gpu_corr_vec");
+	copy_array_to_gpu((void*)corr_vec,(void**)&(gpu_corr_vec),sizeof(double)*intensity.dimenmax*2*intensity.molec.sym_maxdegen,"gpu_corr_vec");
 
-	double* half_ls = new double[intensity.dimenmax];
+	double* half_ls = new double[intensity.dimenmax*2*intensity.molec.sym_maxdegen];
 	double* gpu_half_ls;
 
-	copy_array_to_gpu((void*)half_ls,(void**)&(gpu_half_ls),sizeof(double)*intensity.dimenmax,"gpu_half_ls1");
+	copy_array_to_gpu((void*)half_ls,(void**)&(gpu_half_ls),sizeof(double)*intensity.dimenmax*2*intensity.molec.sym_maxdegen,"gpu_half_ls1");
 
 
 	char filename[1024];
@@ -67,8 +67,11 @@ __host__ void benchmark_half_ls(FintensityJob & intensity,int no_initial_states)
 	//Testing variables
 	double time=0.0,half_ls_time=0,flipped_half_ls_time=0;
 	int states_done = 0;
-
-
+	cudaStream_t* stream = new cudaStream_t[2*intensity.molec.sym_maxdegen];
+	for(int i =0; i < intensity.molec.sym_maxdegen; i++){
+		cudaStreamCreate(&stream[i*2]);
+		cudaStreamCreate(&stream[1 + i*2]);
+		}
 	printf("Nu_if\tJf Kf quantaF\t <-- \tJI KI tauI quantaI\t Ein_A\tLine_str\n");
 	//Run
 	for(int ilevelI = 0; ilevelI < intensity.Neigenlevels; ilevelI++){
@@ -116,7 +119,6 @@ __host__ void benchmark_half_ls(FintensityJob & intensity,int no_initial_states)
 		//for(int ideg = 0; ideg < ndegI; ideg++){
 		//host_correlate_vectors(&intensity.bset_contr[indI+1],0,igammaI,intensity.bset_contr[indI+1].ijterms,intensity.molec.sym_degen,initial_vec,corr_vec);
 
-    	        blockSize =64;
 
  
     	      // Number of thread blocks in grid
@@ -133,7 +135,7 @@ __host__ void benchmark_half_ls(FintensityJob & intensity,int no_initial_states)
 				//				   intensity.g_ptrs.dipole_me,igammaI,gpu_corr_vec,intensity.g_ptrs.threej,
 				//				   gpu_half_ls);	
 				do_1st_half_ls(intensity.g_ptrs.bset_contr[indI],intensity.g_ptrs.bset_contr[indF],intensity.dimenmax,ideg,igammaI,intensity.g_ptrs.dipole_me
-							, gpu_initial_vec,gpu_corr_vec,intensity.g_ptrs.threej,gpu_half_ls,0);				
+							, gpu_initial_vec,gpu_corr_vec+ indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ,intensity.g_ptrs.threej,gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ,stream[indF + ideg*nJ]);				
 			}
 	      	}
 		cudaDeviceSynchronize();
@@ -141,25 +143,25 @@ __host__ void benchmark_half_ls(FintensityJob & intensity,int no_initial_states)
 		time = GetTimeMs64()-time;
 		flipped_half_ls_time += time/1000.0;	
 		printf("%i - Flipped half_ls done in: %11.4fs\n",states_done,time/1000.0);
-/*
+		
 		time = GetTimeMs64();
+
 	       cudaDeviceSynchronize();
 	       for(int ideg=0; ideg < ndegI; ideg++){
 			for(int indF =0; indF < nJ; indF++){
-			        
-	     			device_compute_1st_half_ls<<<gridSize,blockSize>>>(intensity.g_ptrs.bset_contr[indI],intensity.g_ptrs.bset_contr[indF],
-								   intensity.g_ptrs.dipole_me,igammaI,gpu_corr_vec,intensity.g_ptrs.threej,
-								   gpu_half_ls);				
+		
+				do_1st_half_ls_branch(intensity.g_ptrs.bset_contr[indI],intensity.g_ptrs.bset_contr[indF],intensity.dimenmax,ideg,igammaI,intensity.g_ptrs.dipole_me
+							, gpu_initial_vec,gpu_corr_vec+ indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ,intensity.g_ptrs.threej,gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ,stream[indF + ideg*nJ]);				
 			}
 	      }
 		cudaDeviceSynchronize();
-		CheckCudaError("Normal half ls");
+		CheckCudaError("Branch");
 
 		time = GetTimeMs64()-time;
-		printf("%i - Normal half_ls done in: %11.4fs\n",states_done,time/1000.0);
+		printf("%i - Branch half_ls done in: %11.4fs\n",states_done,time/1000.0);
 		half_ls_time += time/1000.0;
-
-*/
+		
+		
 
 		CheckCudaError("First run");
 		states_done++;
@@ -173,11 +175,11 @@ __host__ void benchmark_half_ls(FintensityJob & intensity,int no_initial_states)
 	}
 		printf("State stats-  largest dimension: %i number of degeneracies: %i\n",intensity.dimenmax,intensity.molec.sym_maxdegen) ;
 		printf("-----------------Time results---------------------\n");
-		printf("Half_ls - Total time: %11.4fs Average Time per state: %11.4fs\n",half_ls_time,half_ls_time/double(no_initial_states));
+		printf("Branch - Total time: %11.4fs Average Time per state: %11.4fs\n",half_ls_time,half_ls_time/double(no_initial_states));
 		printf("Flipped - Total time: %11.4fs Average Time per state: %11.4fs\n",flipped_half_ls_time,flipped_half_ls_time/double(no_initial_states));
 		printf("Total states completed: %i\n",states_done);
 	
-
+		cudaDeviceReset();
 
 	
 
