@@ -7,12 +7,12 @@
 #include <cstdlib>
 #include <omp.h>
 double pi = 4.0 * atan2(1.0,1.0);
-double A_coef_s_1 = 64.0*pow(10,-36) * pow(pi,4)  / (3.0 * 6.62606896*pow(10,-27));
-double planck = 6.62606896*pow(10,-27);
-double avogno = 6.0221415*pow(10,23);
-double vellgt = 2.99792458*pow(10,10);
-double intens_cm_mol  = 8.0*pow(10,-36) * pow(pi,3)*avogno/(3.0*planck*vellgt);
-double boltz = 1.380658*pow(10,-16);
+double A_coef_s_1 = 64.0*pow(10.0,-36.0) * pow(pi,4.0)  / (3.0 * 6.62606896*pow(10.0,-27.0));
+double planck = 6.62606896*pow(10.0,-27.0);
+double avogno = 6.0221415*pow(10.0,23.0);
+double vellgt = 2.99792458*pow(10.0,10.0);
+double intens_cm_mol  = 8.0*pow(10.0,-36.0) * pow(pi,3.0)*avogno/(3.0*planck*vellgt);
+double boltz = 1.380658*pow(10.0,-16.0);
     //beta = planck * vellgt / (boltz * intensity%temperature)
 
 void CheckCudaError(const char* tag){
