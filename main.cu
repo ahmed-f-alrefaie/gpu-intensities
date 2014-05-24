@@ -36,18 +36,24 @@ int main(int argc,char** argv)
 	//exit(0);
 	
 	//
-	
-	//dipol_do_intensities(test_intensity);
-	//dipole_do_intensities_async(test_intensity,0);
-	//Set number of threads
-	/*dipole_initialise_cpu(&test_intensity);
 	char* gpu_env = getenv("NUM_GPUS");
 	int num_gpu = 1;	
 	
 	if(gpu_env!=NULL){
 		num_gpu = atoi(gpu_env);
 	}
-	//num_gpu = 1;
+
+	int free_gpus = count_free_devices();
+	printf("Found %i free devices\n",free_gpus);
+	//exit(0);
+
+	
+	//dipol_do_intensities(test_intensity);
+	//dipole_do_intensities_async(test_intensity,0);
+	//Set number of threads
+	dipole_initialise_cpu(&test_intensity);
+
+	num_gpu = 1;
 	omp_set_dynamic(0);
 	omp_set_num_threads(num_gpu);
 	//Parallel region here
@@ -56,18 +62,18 @@ int main(int argc,char** argv)
 
 	#pragma omp parallel default(shared) shared(test_intensity)
 	{
-		int device = omp_get_thread_num();		
-		dipole_do_intensities_async_omp(test_intensity,device,num_gpu);
 		
+		int device= omp_get_thread_num();		
+		dipole_do_intensities_async_omp(test_intensity,0,1);
+				
 	}
 
 	time = GetTimeMs64() - time;
 	printf("\ndone\n");
 	printf("\ndone in %.fs\n",time/1000.0);
-*/
-	
+
 	//dipole_initialise(&test_intensity);
-	benchmark_half_ls(test_intensity,10);
+	//benchmark_half_ls(test_intensity,10);
 
 	
 	exit(0);

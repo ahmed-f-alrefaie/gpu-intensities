@@ -195,7 +195,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole(cuda_bset_contrT* bset
 		        kI = bset_contrI->k[irootI]; 
 			tauI = bset_contrI->ktau[irootI] & 1;
 
-		        kI_kF_diff = (((kI - kF)^(kI-kF)>>31) - ( (kI-kF) >> 31 ) ) <= 1;
+		        kI_kF_diff = abs(kI-kF) <=1;
 
 		        sigmaI = (kI % 3)*tauI;
 			sigmaI = 2*(!(sigmaI+kI) & 1)-1;
