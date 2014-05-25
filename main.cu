@@ -36,7 +36,7 @@ int main(int argc,char** argv)
 	//exit(0);
 	
 	//
-	char* gpu_env = getenv("NUM_GPUS");
+	/*char* gpu_env = getenv("NUM_GPUS");
 	int num_gpu = 1;	
 	
 	if(gpu_env!=NULL){
@@ -71,9 +71,9 @@ int main(int argc,char** argv)
 	time = GetTimeMs64() - time;
 	printf("\ndone\n");
 	printf("\ndone in %.fs\n",time/1000.0);
-
+*/
 	//dipole_initialise(&test_intensity);
-	//benchmark_half_ls(test_intensity,10);
+	benchmark_half_ls(test_intensity,1);
 
 	
 	exit(0);

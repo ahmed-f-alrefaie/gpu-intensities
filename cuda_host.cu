@@ -748,7 +748,7 @@ __host__ void do_1st_half_ls(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bse
 		  int gridSize = gridSize = (int)ceil((float)dimenMax/blockSize);
 		
 		  device_correlate_vectors<<<gridSize,blockSize,0,stream>>>(bset_contrI,idegI,igammaI, vecI,vec);
-		  blockSize = 384;
+		  blockSize = 64;
 		  int numSMs;
 		  cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
 		  
@@ -1493,10 +1493,14 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 
 	      stat = cublasSetVector(nsizeI, sizeof(double),initial_vector, 1, gpu_initial_vector, 1);
 	      
-	      CheckCudaError("Set Vector I");			
+	      CheckCudaError("Set Vector I");
+			
    		//Do first half ls
+	for(int indF =0; indF < nJ; indF++){
+			int jF= intensity.jvals[indF];
+		if(!indF_filter(intensity,jI,jF,energyI,igammaI,quantaI))continue;
 	      for(int ideg=0; ideg < ndegI; ideg++){
-			for(int indF =0; indF < nJ; indF++){
+			
 				do_1st_half_ls(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
 						intensity.dimenmax,ideg,igammaI,g_ptrs.dipole_me,gpu_initial_vector,gpu_corr_vectors + intensity.dimenmax*ideg,
 										g_ptrs.threej,
@@ -1595,7 +1599,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]=0.0;
 						line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen] = 0.0;
 						cublasSetStream(handle,st_ddot_vectors[stream_count]);
-						cublasDdot (handle, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
+						cublasDdot (handle, min(dimenF,dimenI),gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
 														&line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
 
 					}

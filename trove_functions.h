@@ -23,3 +23,4 @@ bool energy_filter_lower(FintensityJob & job,int J,double energy, int* quanta);
 bool energy_filter_upper(FintensityJob & job,int J,double energy, int* quanta);
 bool intensity_filter(FintensityJob & job,int jI,int jF,double energyI,double energyF,int igammaI,int igammaF,int* quantaI,int* quantaF);
 const char* branch(int jI,int jF);
+bool indF_filter(FintensityJob & job,int jI,int jF,double energyI,int igammaI,int* quantaI);

@@ -1303,6 +1303,25 @@ const char* branch(int jF,int jI){
 		case -1: return "P";
 	}
 		
+};
+
+bool indF_filter(FintensityJob & job,int jI,int jF,double energyI,int igammaI,int* quantaI){
+
+	double energyF;
+	int* quantaF;
+	int igammaF;
+	for(int ilevelF=0; ilevelF < job.Neigenlevels; ilevelF++){
+		if(job.eigen[ilevelF].jval != jF) continue;
+		energyF = job.eigen[ilevelF].energy;
+		igammaF = job.eigen[ilevelF].igamma;
+		quantaF = job.eigen[ilevelF].quanta;
+		if(intensity_filter(job,jI,jF,energyI,energyF,igammaI,igammaF,quantaI,quantaF)) return true;
+		
+	}
+	
+	return false;
+
+
 }
 
 	//
