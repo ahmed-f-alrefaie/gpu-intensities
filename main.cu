@@ -53,7 +53,7 @@ int main(int argc,char** argv)
 	//Set number of threads
 	dipole_initialise_cpu(&test_intensity);
 
-	num_gpu = 1;
+	//num_gpu = 1;
 	omp_set_dynamic(0);
 	omp_set_num_threads(num_gpu);
 	//Parallel region here
@@ -64,7 +64,7 @@ int main(int argc,char** argv)
 	{
 		
 		int device= omp_get_thread_num();		
-		dipole_do_intensities_async_omp(test_intensity,0,1);
+		dipole_do_intensities_async_omp(test_intensity,device,num_gpu);
 				
 	}
 
