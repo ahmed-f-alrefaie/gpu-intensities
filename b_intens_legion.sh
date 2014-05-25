@@ -63,6 +63,7 @@ echo "Working dir is " $pwd
 
 #bsub -n $nproc -J $name -x -o $name.o -e $name.e -W $wclim:00 -m $jobtype run_intens_emerald.sh $pwd $name $nproc $exec
 
-qsub -N $name lj oe -e $name.e -p exomolaar -l "h_rt=$wclim:00:00,mem=36G,gpu=2" run_intens_legion.sh $pwd $name $nproc $exec
+#qsub -N $name lj oe -e $name.e -p exomolaar -l "h_rt=$wclim:00:00,mem=36G,gpu=2" run_intens_legion.sh $pwd $name $nproc $exec
+qsub -N $name -P exomolaar -l "h_rt=$wclim:00:00,mem=10G,gpu=2" run_intens_legion.sh $pwd $name $nproc $exec
 
 
