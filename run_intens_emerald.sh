@@ -13,4 +13,4 @@ module load cuda/6.0.37
 module load intel/14.0.2
 
 
-./$exec < $wd/$name.inp > $wd/$name.out
+$pwd/$exec < $wd/$name.inp > $wd/$name.out
