@@ -117,14 +117,33 @@ int count_free_devices(){
         printf("\nCUDA Device #%d\n", i);
         cudaDeviceProp devProp;
         cudaGetDeviceProperties(&devProp, i);
-	if(devProp.computeMode != cudaComputeModeExclusiveProcess)
+	cudaSetDevice(i);
+	if(cudaFree(0)==cudaSuccess){	
 		free_devices++;
+		cudaThreadExit();
+	}
 
     }    // Iterate through devices
    return free_devices;
 }
 
+int get_free_device(int last){
+	int device_id=-1;
+	last++;
+	int devCount;
+	cudaGetDeviceCount(&devCount);
+	for(int i=last; i< devCount; i++){
+		cudaSetDevice(i);
+		if(cudaFree(0)==cudaSuccess){
+			cudaThreadExit();
+			return i;
+		}	
+	}
 
+	return -1;
+
+
+}
 
 __host__ void copy_dipole_host(double* dipole_me,double** dipole_me_host,size_t & dip_size)
 {
@@ -1458,7 +1477,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	//Run
 
 	#pragma omp barrier
-	if(device_id==0){
+	if(omp_get_thread_num()==0){
 		printf("Linestrength S(f<-i) [Debye**2], Transition moments [Debye],Einstein coefficient A(if) [1/s],and Intensities [cm/mol]\n\n\n");
 	}
 
@@ -1468,7 +1487,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	double boltz_fc=0.0;
 	double absorption_int = 0.0;
 
-	for(int ilevelI = device_id; ilevelI < intensity.Neigenlevels; ilevelI+=num_devices){
+	for(int ilevelI = omp_get_thread_num(); ilevelI < intensity.Neigenlevels; ilevelI+=num_devices){
 		//printf("new I level!\n");
 		//Get the basic infor we need
 	      int indI = intensity.eigen[ilevelI].jind;

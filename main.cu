@@ -47,7 +47,7 @@ int main(int argc,char** argv)
 	printf("Found %i free devices\n",free_gpus);
 	//exit(0);
 
-	
+	num_gpu=min(free_gpus,num_gpus);
 	//dipol_do_intensities(test_intensity);
 	//dipole_do_intensities_async(test_intensity,0);
 	//Set number of threads
