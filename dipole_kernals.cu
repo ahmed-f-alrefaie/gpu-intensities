@@ -225,6 +225,76 @@ __global__ void device_compute_1st_half_ls_flipped_dipole(cuda_bset_contrT* bset
 	}
 		
 }
+
+__global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int startF,int endF,double* dipole_me,double* vector,double* threej,double* half_ls)
+{
+
+	//const int irootF = blockIdx.x * blockDim.x + threadIdx.x;
+	//double sq2 = 1.0/sqrt(2.0);
+	const int dimenI = bset_contrI->Maxcontracts;
+	
+	int icontrF,icontrI,kF, kI, tauI,tauF,sigmaF, sigmaI, jI,jF,dipole_idx;
+	//These are o remove if statements
+	bool kI_kF_diff,kI_kF_eq,tauF_tauI_neq,kI_kF_zero;
+	double ls = 0.0,f3j=0.0,final_half_ls;
+	
+	
+	jI = bset_contrI->jval;
+	jF = bset_contrF->jval;
+	
+	
+	for(int irootF=blockIdx.x * blockDim.x + threadIdx.x + startF; irootF < endF; irootF+=blockDim.x*gridDim.x)
+	{
+		final_half_ls = 0.0;
+	
+		//If we are out of range the we always acces the zeroth element
+		icontrF = bset_contrF->iroot_correlat_j0[irootF];
+	
+		tauF  =  bset_contrF->ktau[irootF] & 1;
+		kF = bset_contrF->k[irootF];
+
+		sigmaF = (kF % 3)*tauF;
+
+		for(int irootI = 0; irootI < dimenI; irootI++)
+		{
+			//All non-dipole global accesses
+		        icontrI = bset_contrI->iroot_correlat_j0[irootI];
+		        kI = bset_contrI->k[irootI]; 
+			tauI = bset_contrI->ktau[irootI] & 1;
+
+		        kI_kF_diff = abs(kI-kF) <=1;
+
+		        sigmaI = (kI % 3)*tauI;
+			sigmaI = 2*(!(sigmaI+kI) & 1)-1;
+		
+			f3j  =  threej[jI + kI*(int_info.jmax) + (jF - jI + 1)*(int_info.jmax)*(int_info.jmax) + (kF - kI +1)*kI_kF_diff*(int_info.jmax)*(int_info.jmax)*3];  //this is big and unwieldy
+			//if(fabsf(f3j) < 0.00000000000000001) continue;
+		        //Evaluate all conditions without branching
+		        kI_kF_eq = (kF==kI); // 1 or 0
+		          
+		        tauF_tauI_neq = (tauF!=tauI); // 1 or  0
+		          
+		        kI_kF_zero = ((kI*kF) != 0); // 1 or zero       //If evaluated with CMP branch instruction then implement my own
+
+		        dipole_idx=2*(kI_kF_eq)+(!kI_kF_eq)*(tauF_tauI_neq)*0 + (!kI_kF_eq)*(!tauF_tauI_neq)*1;
+			  // These accesses should be coalesed and therefore significantly faster
+			ls = dipole_me[icontrF + icontrI*(int_info.dip_stride_1/2) + dipole_idx*(int_info.dip_stride_1/2)*int_info.dip_stride_1];
+
+			ls *= double(tauF-tauI)*double(kI_kF_eq) + (tauF-tauI)*(kF-kI)*(!kI_kF_eq)*( tauF_tauI_neq) + -1.0*(!kI_kF_eq)*(!tauF_tauI_neq);
+			  
+		          //Only contribue if in range
+			final_half_ls+=double(sigmaI)*ls*f3j*vector[irootI]*double(kI_kF_diff)*(1.0 + (int_info.sq2 - 1.0)*double(kI_kF_zero)*(!kI_kF_eq));	
+							
+		}
+	
+		final_half_ls *= double(2*(!(sigmaF) & 1)-1);
+		half_ls[irootF] = final_half_ls;
+
+	}
+		
+}
+
+
 __global__ void device_compute_1st_half_ls_flipped_dipole_branch(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,double* dipole_me,double* vector,double* threej,double* half_ls)
 {
 

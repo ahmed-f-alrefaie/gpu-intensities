@@ -37,15 +37,10 @@ export nproc=$2
 export jobtype="emerald3g"
 export wclim=$3
 
-if [ "$nproc" -gt "5" ]; then
-  export nproc=8
+if [ "$nproc" -gt "3" ]; then
   export jobtype="emerald8g";
 fi
 
-if [ "$nproc" -lt "6" ]; then
-  export nproc=3
-  export jobtype="emerald3g"
-fi
 
 
 echo "Nproc=" $nproc
@@ -66,7 +61,7 @@ echo "Working dir is " $pwd
 #     --workdir=$pwd --hint=compute_bound --no-requeue --mem=$MEM -p sandybridge \
 #     $pwd/run_trove.csh $nproc $name $exec $pwd
 
-bsub -n $nproc -J $name -x -o $name.o -e $name.e -W $wclim:00 -m $jobtype $pwd/run_intens_emerald.sh $pwd $name $nproc $exec 
+bsub -n $nproc -J $name -o $name.o -e $name.e -W $wclim:00 -m $jobtype $pwd/run_intens_emerald.sh $pwd $name $nproc $exec 
 
 
 

@@ -16,6 +16,18 @@ struct Fmole_type{
 	char** c_sym;
 };	//Intensity job information
 
+struct FDipole_block{
+	double* dipole;
+	int startF;
+	int endF;
+	size_t size;
+};
+struct FDipole_ptrs{
+	int parts;
+	FDipole_block* dip_block;
+};
+
+
 struct FGPU_ptrs{
 	double* dipole_me;
 	double* threej;
@@ -55,6 +67,7 @@ struct FintensityJob{
 	//Will b replaced with something better
 	unsigned long cpu_memory;
 	unsigned long gpu_memory;
+	FDipole_ptrs dipole_blocks;
 
 };
 
