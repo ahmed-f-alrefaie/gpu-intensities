@@ -1075,6 +1075,7 @@ void read_eigenvalues(FintensityJob & job){
 	double energy;
 	int maxj = 0;
 	int iroot = 0;
+	maxdeg = 0;
 	
 	for(int i = 0; i < 2; i++)
 		maxj = max(maxj,job.jvals[i]);
@@ -1179,10 +1180,12 @@ void read_eigenvalues(FintensityJob & job){
       !
     enddo
 	*/
-
+	printf("Maxdeg = %i\n",maxdeg);
+	//exit(0);
 	//allocate memory
 	for(int i = 0; i < job.Neigenlevels; i++)
 	{
+
 		job.eigen[i].irec = new int[maxdeg];
 		job.eigen[i].iroot = new int[maxdeg];
 		job.eigen[i].quanta = new int[job.molec.nmodes+1];

@@ -1611,12 +1611,11 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 				//for(int i = 0; i < ndeg
 				//Correlate the vectors
 				for(idegF = 0; idegF < ndegF; idegF++){
-					gridSize = (int)ceil((float)dimenF/blockSize);
-					device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[stream_count]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.nsizemax),gpu_corr_vectors + intensity.dimenmax*i);
-
+					//gridSize = (int)ceil((float)dimenF/blockSize);
 					for(idegI=0; idegI < ndegI; idegI++){
 						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]=0.0;
 						line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen] = 0.0;
+						device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[stream_count]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.nsizemax),gpu_corr_vectors + intensity.dimenmax*i);
 						cublasSetStream(handle,st_ddot_vectors[stream_count]);
 						cublasDdot (handle, min(dimenF,dimenI),gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
 														&line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
@@ -1693,9 +1692,11 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 				int ndegF   = intensity.eigen[ilevelF].ndeg;
 				//cudaStreamSynchronize(st_ddot_vectors[ivec]);
 				double ls=0.0;
+				double linestr=0.0;
 			        for(int idegF=0; idegF < ndegF; idegF++){
 				      for(int idegI=0; idegI < ndegI; idegI++){
-						ls +=line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]*line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen];
+						linestr=line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen];
+						ls +=(linestr*linestr);		//line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]*line_str[ivec + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen];
 						
 					}
 				}
@@ -1706,6 +1707,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 				//Print intensitys
 				//printf("line_str %11.4e\n",line_str);
 				double A_einst = A_coef_s_1*double((2*jI)+1)*final_ls*pow(abs(nu_if),3);
+
 				final_ls = final_ls * intensity.gns[igammaI] * double( (2*jI + 1)*(2 * jF + 1) );
 				absorption_int = final_ls * intens_cm_mol * boltz_fc;
 				//if(final_ls < intensity.thresh_linestrength) continue;
