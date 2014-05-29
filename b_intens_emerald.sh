@@ -61,7 +61,8 @@ echo "Working dir is " $pwd
 #     --workdir=$pwd --hint=compute_bound --no-requeue --mem=$MEM -p sandybridge \
 #     $pwd/run_trove.csh $nproc $name $exec $pwd
 
-bsub -n $nproc -J $name -o $name.o -e $name.e -W $wclim:00 -m $jobtype $pwd/run_intens_emerald.sh $pwd $name $nproc $exec 
+bsub -R "span[ptile=$nproc]" -n $nproc -J $name -o $name.o -e $name.e -W $wclim:00 $pwd/run_intens_emerald.sh $pwd $name $nproc $exec 
+
 
 
 

@@ -32,6 +32,20 @@ void destroy_arr_valid(void** ptr)
 	}
 }
 
+
+size_t GetFilenameSize(std::string name)
+{
+	FILE* pFile;
+	pFile = fopen(name.c_str(),"r");
+	size_t or_pos = ftell(pFile);
+	fseek(pFile,0,SEEK_END);
+	size_t file_size = ftell(pFile);
+	//Return to original position
+	fseek(pFile,or_pos,SEEK_SET);
+	fclose(pFile);
+	return file_size;
+};
+
 // trim from start
 std::string &ltrim(std::string &s) {
         s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));

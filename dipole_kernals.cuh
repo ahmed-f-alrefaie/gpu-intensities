@@ -10,4 +10,4 @@ __global__ void device_clear_vector(double* vec,int N);
 __global__ void device_compute_1st_half_ls_2D(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,double* dipole_me,int igammaI,double* vector,double* threej,double* half_ls);
 __global__ void device_complete_half_ls_dimenF(cuda_bset_contrT* bset_contrF,double* half_ls);
 __global__ void device_compute_1st_half_ls_dimenF(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,double* dipole_me,int irootF,int igammaI,int idegI,double* vector,double* threej,double* half_ls);
-__global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int startF,int endF,double* dipole_me,double* vector,double* threej,double* half_ls);
+__global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int startF,int endF,int ncontrF,double* dipole_me,double* vector,double* threej,double* half_ls);

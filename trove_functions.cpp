@@ -204,13 +204,12 @@ void read_dipole_flipped(TO_bset_contrT & bsetj0,double** dipole_me,size_t & dip
 	
 }
 
-void read_dipole_flipped_blocks(TO_bset_contrT & bsetj0,FDipole_ptrs & dip_blocks)
+void read_dipole_flipped_blocks(TO_bset_contrT & bsetj0,FDipole_ptrs & dipole_block, int parts)
 {
 	char buff[20];
 	int imu,imu_t;
 	int ncontr_t;
    	size_t matsize,rootsize,rootsize_t,rootsize2;
-   	double**dipole_me;
 	FILE* extF = fopen(extFmat_file,"r");
 	
 	if(extF == NULL)
@@ -249,7 +248,7 @@ void read_dipole_flipped_blocks(TO_bset_contrT & bsetj0,FDipole_ptrs & dip_block
 	int contr_div = ceil(float(ncontr_t)/2.0f);
 	matsize = rootsize2*3;
 	double* temp_dipole = new double[matsize];
-	(*dipole_me) = new double[matsize];
+	//(*dipole_me) = new double[matsize];
 	
 	for(int i = 0 ; i< 3; i++)
 	{
@@ -283,14 +282,31 @@ void read_dipole_flipped_blocks(TO_bset_contrT & bsetj0,FDipole_ptrs & dip_block
 		//		printf("dipole[%i,%i,%i] = %16.8e\n",i,j,k,(*dipole_me)[i + j*ncontr_t + k*ncontr_t*ncontr_t]);
 	//exit(0);
 	#endif
-	printf("Flipping dipole...and blocking.");
-	for(int blocks = 0; blocks < 2; blocks++){
-			
+	int n_contr_block = ceil(float(ncontr_t)/float(parts));
+	int cur_block_size = 0;
+	int startF=0,endF=0,ncontrF=0;
+	//Allocate X parts
+	dipole_block.dip_block=new FDipole_block[parts];
+	dipole_block.parts=parts;	
+	printf("Flipping dipole...and blocking int %i parts\n",parts);
+	for(int blocks = 0; blocks < parts; blocks++){
+		startF=blocks*n_contr_block;
+		printf("startF =%i, blocks = %i, n_contr_block = %i\n",startF,blocks,n_contr_block);
+		endF = (blocks+1)*n_contr_block;
+		endF = min(endF,ncontr_t);
+		ncontrF = endF-startF;
+		//Allocate the dipole
+		dipole_block.dip_block[blocks].startF = startF;
+		dipole_block.dip_block[blocks].endF = endF;
+		dipole_block.dip_block[blocks].dipole_me = new double[ncontrF*ncontr_t*3];
+		dipole_block.dip_block[blocks].size = sizeof(double)*ncontrF*ncontr_t*3;
+		printf("Size of part %i is %zu\n",blocks,dipole_block.dip_block[blocks].size);
+		dipole_block.dip_block[blocks].ncontrF = ncontrF;
 		
 		for(int i = 0; i < ncontr_t; i++)
-			for(int f = 0; f < ncontr_t; f++)
+			for(int f = startF; f < endF; f++)
 				for(int k = 0; k < 3; k++)
-					(*dipole_me)[f + i*ncontr_t + k*ncontr_t*ncontr_t] = temp_dipole[i + f*ncontr_t + k*ncontr_t*ncontr_t];
+					dipole_block.dip_block[blocks].dipole_me[f-startF + i*ncontrF + k*ncontr_t*ncontrF] = temp_dipole[i + f*ncontr_t + k*ncontr_t*ncontr_t]; 
 
 	}
 

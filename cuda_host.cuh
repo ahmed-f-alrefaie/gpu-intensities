@@ -14,12 +14,12 @@ void copy_array_to_gpu(void* arr,void** arr_gpu,size_t arr_size,const char* arr_
 size_t create_and_copy_bset_contr_to_gpu(TO_bset_contrT* bset_contr,cuda_bset_contrT** bset_gptr,int* ijterms,int sym_nrepres,int*sym_degen);
 void dipole_initialise(FintensityJob* intensity);
 void dipole_do_intensities(FintensityJob & intensity);
-void dipole_do_intensities_async(FintensityJob & intensity,int device_id);
 void get_cuda_info(FintensityJob & intensity);
 void dipole_initialise_cpu(FintensityJob* intensity);
 void dipole_do_intensities_async_omp(FintensityJob & intensity,int device_id,int num_devices);
 int count_free_devices();
 void do_1st_half_ls(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream);
-void do_1st_half_ls_branch(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream);
+void do_1st_half_ls_blocks(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream);
+void do_1st_half_ls_branch(cuda_bset_contrT* bset_contrI,cuda_bset_contrT* bset_contrF,int dimenMax,int idegI,int igammaI,double* gpu_dipole,FDipole_ptrs & dipole_me,double* vecI,double* vec,double* threej,double* half_ls,cudaStream_t stream);
 int get_free_device(int last);
 #endif

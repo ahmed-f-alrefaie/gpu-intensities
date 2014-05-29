@@ -92,7 +92,6 @@ int main(int argc,char** argv)
 		printf("\ndone\n");
 		printf("\ndone in %.fs\n",time/1000.0);
 	}else{
-
 	//dipole_initialise(&test_intensity);
 	benchmark_half_ls(test_intensity,10);
 

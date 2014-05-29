@@ -65,6 +65,42 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 		strcpy(intensity->molec.c_sym[1],"A2");
 		strcpy(intensity->molec.c_sym[2],"E");
 
+	}else if(strcmp("D3H(M)",symchar)==0)
+	{
+		printf("D3H(M) sym");
+		intensity->molec.sym_nrepres = 6;
+		intensity->molec.sym_degen = new int[6];
+		intensity->molec.sym_maxdegen = 2;
+		intensity->isym_do = new bool[6];
+		intensity->molec.sym_degen[0] = 1;
+		intensity->molec.sym_degen[1] = 1;
+		intensity->molec.sym_degen[2] = 2;
+		intensity->molec.sym_degen[3] = 1;
+		intensity->molec.sym_degen[4] = 1;
+		intensity->molec.sym_degen[5] = 2;
+
+		intensity->isym_do[0] = true;
+		intensity->isym_do[1] = true;
+		intensity->isym_do[2] = true;
+		intensity->isym_do[3] = true;
+		intensity->isym_do[4] = true;
+		intensity->isym_do[5] = true;
+		intensity->gns = new double[6];
+
+		intensity->isym_pairs = new int[6];
+		intensity->igamma_pair = new int[6];
+		
+
+		intensity->molec.c_sym = new char*[6];
+		for(int i = 0; i < 6; i++)
+			intensity->molec.c_sym[i] = new char[10];
+		strcpy(intensity->molec.c_sym[0],"A1");
+		strcpy(intensity->molec.c_sym[1],"A2");
+		strcpy(intensity->molec.c_sym[2],"E");
+		strcpy(intensity->molec.c_sym[3],"A1\"");
+		strcpy(intensity->molec.c_sym[4],"A2\"");
+		strcpy(intensity->molec.c_sym[5],"E\"");
+
 	}
 	else{
 		printf("Symmetry not implemeted\n");

@@ -17,10 +17,11 @@ struct Fmole_type{
 };	//Intensity job information
 
 struct FDipole_block{
-	double* dipole;
+	double* dipole_me;
 	int startF;
 	int endF;
 	size_t size;
+	int ncontrF;
 };
 struct FDipole_ptrs{
 	int parts;
@@ -68,6 +69,7 @@ struct FintensityJob{
 	unsigned long cpu_memory;
 	unsigned long gpu_memory;
 	FDipole_ptrs dipole_blocks;
+	bool split_dipole;
 
 };
 

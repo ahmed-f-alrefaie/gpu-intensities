@@ -10,7 +10,7 @@ typedef unsigned long int uint64;
 void destroy_arr_valid(void** ptr);
 inline unsigned int Fortran2D_to_1D(int i, int j,int isize){ return i+ j*isize;};
 inline unsigned int Fortran3D_to_1D(int i, int j,int k,int isize,int jsize){ return i+ j*isize + k*isize*jsize ;};
-
+size_t GetFilenameSize(std::string name);
 bool fexists(const char *filename);
 
 // trim from start
