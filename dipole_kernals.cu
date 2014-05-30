@@ -198,7 +198,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole(cuda_bset_contrT* bset
 		        kI_kF_diff = abs(kI-kF) <=1;
 
 		        sigmaI = (kI % 3)*tauI;
-			sigmaI = 2*(!(sigmaI+kI) & 1)-1;
+			sigmaI = 2*((sigmaI+kI) & 1)-1;
 		
 			f3j  =  threej[jI + kI*(int_info.jmax) + (jF - jI + 1)*(int_info.jmax)*(int_info.jmax) + (kF - kI +1)*kI_kF_diff*(int_info.jmax)*(int_info.jmax)*3];  //this is big and unwieldy
 			//if(fabsf(f3j) < 0.00000000000000001) continue;
@@ -220,7 +220,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole(cuda_bset_contrT* bset
 							
 		}
 	
-		final_half_ls *= double(2*(!(sigmaF) & 1)-1);
+		final_half_ls *= double(2*((sigmaF) & 1)-1);
 		half_ls[irootF] = final_half_ls;
 	}
 		
@@ -267,7 +267,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contr
 				kI_kF_diff = abs(kI-kF) <=1;
 
 				sigmaI = (kI % 3)*tauI;
-				sigmaI = 2*(!(sigmaI+kI) & 1)-1;
+				sigmaI = 2*!((sigmaI+kI) & 1)-1;
 		
 				f3j  =  threej[jI + kI*(int_info.jmax) + (jF - jI + 1)*(int_info.jmax)*(int_info.jmax) + (kF - kI +1)*kI_kF_diff*(int_info.jmax)*(int_info.jmax)*3];  //this is big and unwieldy
 				//if(fabsf(f3j) < 0.00000000000000001) continue;
@@ -289,7 +289,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contr
 							
 			}
 	
-			final_half_ls *= double(2*(!(sigmaF) & 1)-1);
+			final_half_ls *= double(2*!(sigmaF & 1)-1);
 			half_ls[irootF] = final_half_ls;
 		}
 
