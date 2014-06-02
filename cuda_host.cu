@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <omp.h>
 
-const size_t max_dipole_size = 1l*1024l*1024l*1024l; 
+const size_t max_dipole_size = 5l*1024l*1024l*1024l; 
 
 double pi = 4.0 * atan2(1.0,1.0);
 double A_coef_s_1 = 64.0*pow(10.0,-36.0) * pow(pi,4.0)  / (3.0 * 6.62606896*pow(10.0,-27.0));
