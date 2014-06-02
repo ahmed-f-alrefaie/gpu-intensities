@@ -14,6 +14,7 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 	if(strcmp("C2V(M)",symchar)==0)
 	{
 		//printf("C2v(M) sym");
+		intensity->molec.sym_type = C2VM_ID;
 		intensity->molec.sym_nrepres = 4;
 		intensity->molec.sym_degen = new int[4];
 		intensity->molec.sym_maxdegen = 1;
@@ -42,6 +43,7 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 	}else if(strcmp("C3V(M)",symchar)==0)
 	{
 		printf("C3v(M) sym");
+		intensity->molec.sym_type = C3VM_ID;
 		intensity->molec.sym_nrepres = 3;
 		intensity->molec.sym_degen = new int[3];
 		intensity->molec.sym_maxdegen = 2;
@@ -68,6 +70,7 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 	}else if(strcmp("D3H(M)",symchar)==0)
 	{
 		printf("D3H(M) sym");
+		intensity->molec.sym_type = D3HM_ID;
 		intensity->molec.sym_nrepres = 6;
 		intensity->molec.sym_degen = new int[6];
 		intensity->molec.sym_maxdegen = 2;
@@ -220,6 +223,11 @@ void read_intensities(FintensityJob* intensity)
 					line_ptr=readc();
 				}
 			}
+			else if(strcmp("SYMMETRY",line_ptr)==0){
+				line_ptr=readc();
+				if(strcmp("REDUCED",line_ptr)==0)
+					intensity->reduced=true;
+			}
 		}		
 	}
 
@@ -232,6 +240,7 @@ void read_fields(FintensityJob* intensity){
 	char linestr[2024];
 	intensity->quanta_lower=NULL;
 	intensity->quanta_upper=NULL;
+	intensity->reduced = false;
 	while(getline(cin,line)){
 		cout<<line<<endl;
 		strcpy (linestr, line.c_str());

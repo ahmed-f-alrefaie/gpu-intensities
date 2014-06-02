@@ -54,7 +54,7 @@ __global__ void device_correlate_vectors(cuda_bset_contrT* bset_contr,int idegI,
 		nelem = bset_contr->N[igammaI + irow*int_info.sym_nrepres];
 	
 		Ntot = bset_contr->Ntotal[igammaI];
-		sdeg = int_info.sym_degen[igammaI];
+		sdeg = int_info.sym_degen[igammaI]-1;
 		double* irr = bset_contr->irr_repres[igammaI];
 		
 		for(int i = 0; i < nelem; i++)
@@ -168,7 +168,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole(cuda_bset_contrT* bset
 	
 	int icontrF,icontrI,kF, kI, tauI,tauF,sigmaF, sigmaI, jI,jF,dipole_idx;
 	//These are o remove if statements
-	bool kI_kF_diff,kI_kF_eq,tauF_tauI_neq,kI_kF_zero;
+	int kI_kF_diff,kI_kF_eq,tauF_tauI_neq,kI_kF_zero;
 	double ls = 0.0,f3j=0.0,final_half_ls;
 	
 	
@@ -232,7 +232,7 @@ __global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contr
 	//const int irootF = blockIdx.x * blockDim.x + threadIdx.x;
 	//double sq2 = 1.0/sqrt(2.0);
 	const int dimenI = bset_contrI->Maxcontracts;
-	const int dimenF = bset_contrI->Maxcontracts;
+	const int dimenF = bset_contrF->Maxcontracts;
 	int irootF,icontrF,icontrI,kF, kI, tauI,tauF,sigmaF, sigmaI, jI,jF,dipole_idx;
 	//These are o remove if statements
 	bool kI_kF_diff,kI_kF_eq,tauF_tauI_neq,kI_kF_zero;
@@ -285,11 +285,11 @@ __global__ void device_compute_1st_half_ls_flipped_dipole_blocks(cuda_bset_contr
 				ls *= double(tauF-tauI)*double(kI_kF_eq) + (tauF-tauI)*(kF-kI)*(!kI_kF_eq)*( tauF_tauI_neq) + -1.0*(!kI_kF_eq)*(!tauF_tauI_neq);
 				  
 				  //Only contribue if in range
-				final_half_ls+=double(sigmaI)*ls*f3j*vector[irootI]*double(kI_kF_diff)*(1.0 + (int_info.sq2 - 1.0)*double(kI_kF_zero)*(!kI_kF_eq));	
+				final_half_ls+=double(sigmaI)*ls*f3j*vector[irootI]*double(kI_kF_diff)*(1.0 + (int_info.sq2 - 1.0)*double(kI_kF_zero)*(!kI_kF_eq));
 							
 			}
 	
-			final_half_ls *= double(2*(~sigmaF & 1)-1);
+			final_half_ls *= double(2*(~(sigmaF) & 1)-1);
 			half_ls[irootF] = final_half_ls;
 		}
 

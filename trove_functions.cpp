@@ -1461,4 +1461,20 @@ bool indF_filter(FintensityJob & job,int jI,int jF,double energyI,int igammaI,in
 
 }
 
+bool degeneracy_filter(FintensityJob & job, int gammaI,int gammaF,int idegI,int idegF){
+	if(job.molec.sym_degen[gammaI]==1 || job.molec.sym_degen[gammaF]==1) return true;
+	if(!job.reduced) return true;
+
+	switch(job.molec.sym_type){
+		case C3VM_ID:
+		case D3HM_ID:
+			if(idegI==1 && idegF==0) return true; else return false;
+		break;
+		default:
+			return true;
+	
+	}
+ 
+
+}
 	//

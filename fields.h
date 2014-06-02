@@ -3,6 +3,12 @@
 #include <cstring>
 #pragma once
 
+//SYMMTRYIRES
+
+#define C2VM_ID 1
+#define C3VM_ID 2
+#define D3HM_ID 3
+
 
 struct Fmole_type{
 	//number of modes
@@ -14,6 +20,7 @@ struct Fmole_type{
 	int* sym_degen;
 	int sym_maxdegen;
 	char** c_sym;
+	int sym_type;
 };	//Intensity job information
 
 struct FDipole_block{
@@ -70,6 +77,7 @@ struct FintensityJob{
 	unsigned long gpu_memory;
 	FDipole_ptrs dipole_blocks;
 	bool split_dipole;
+	bool reduced;
 
 };
 

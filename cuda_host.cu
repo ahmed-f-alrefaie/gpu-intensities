@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <omp.h>
 
-const size_t max_dipole_size = 5l*1024l*1024l*1024l; 
+const size_t max_dipole_size = 1l*1024l*1024l*1024l; 
 
 double pi = 4.0 * atan2(1.0,1.0);
 double A_coef_s_1 = 64.0*pow(10.0,-36.0) * pow(pi,4.0)  / (3.0 * 6.62606896*pow(10.0,-27.0));
@@ -790,6 +790,7 @@ __host__ void do_1st_half_ls_blocks(cuda_bset_contrT* bset_contrI,cuda_bset_cont
 		  blockSize = 64;
 		  gridSize = (int)ceil((float)dimenMax/blockSize);
 		  int parts = dipole_me.parts;
+		 
 		 // printf("parts = %i\n",parts);
 		  for(int i = 0; i < parts; i++){
 			  // printf("i=%i\n startF = %i endF = %i ncontr = %i",i, dipole_me.dip_block[i].startF, dipole_me.dip_block[i].endF ,dipole_me.dip_block[i].ncontrF );
@@ -810,6 +811,7 @@ __host__ void do_1st_half_ls_blocks(cuda_bset_contrT* bset_contrI,cuda_bset_cont
 			CheckCudaError("Memcpy");
 			//cudaDeviceSynchronize();
 		}
+		//exit(0);
 			//exit(0);
 					
 }
@@ -1195,19 +1197,21 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 	      fread(initial_vector,sizeof(double),nsizeI,unitI);
 
 	      stat = cublasSetVector(nsizeI, sizeof(double),initial_vector, 1, gpu_initial_vector, 1);
-	      
+               int idegF_t = 0;
+	       int igammaF_t = intensity.igamma_pair[igammaI];
 	      CheckCudaError("Set Vector I");
    		//Do first half ls
 	for(int indF =0; indF < nJ; indF++){
 			int jF= intensity.jvals[indF];
 		if(!indF_filter(intensity,jI,jF,energyI,igammaI,quantaI))continue;
 	      for(int ideg=0; ideg < ndegI; ideg++){
+			if(!degeneracy_filter(intensity,igammaI,igammaF_t,ideg,idegF_t)) continue;
 			if(intensity.split_dipole == false){
 				do_1st_half_ls(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
 						intensity.dimenmax,ideg,igammaI,g_ptrs.dipole_me,gpu_initial_vector,gpu_corr_vectors + intensity.dimenmax*ideg,
 										g_ptrs.threej,
 											gpu_half_ls + indF*intensity.dimenmax + ideg*intensity.dimenmax*nJ
-												,st_half_ls[indF + ideg*nJ]);
+												,st_half_ls[indF]);
 
 				}else{
 					do_1st_half_ls_blocks(g_ptrs.bset_contr[indI],g_ptrs.bset_contr[indF],
@@ -1290,17 +1294,20 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 				//int irec = intensity.eigen[ilevelF].irec[0]-1;
 				int dimenF = intensity.bset_contr[indF+1].Maxcontracts;
 				int ndegF   = intensity.eigen[ilevelF].ndeg;
-				int idegF = 0;
-				int idegI = 0;
 				int blockSize =512;
 				int gridSize = (int)ceil((float)intensity.dimenmax/blockSize);
 				//for(int i = 0; i < ndeg
 				//Correlate the vectors
-				for(idegF = 0; idegF < ndegF; idegF++){
+				for(int idegF = 0; idegF < ndegF; idegF++){
 					//gridSize = (int)ceil((float)dimenF/blockSize);
-					for(idegI=0; idegI < ndegI; idegI++){
-						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]=0.0;
+					for(int idegI=0; idegI < ndegI; idegI++)
 						line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen] = 0.0;
+
+					if(intensity.reduced && idegF!=0) continue;
+					for(int idegI=0; idegI < ndegI; idegI++){
+						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]=0.0;
+						//line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen] = 0.0;
+						if(!degeneracy_filter(intensity, igammaI,igammaF,idegI,idegF)) continue;
 						device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[stream_count]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.nsizemax),gpu_corr_vectors + intensity.dimenmax*i);
 						cublasSetStream(handle,st_ddot_vectors[stream_count]);
 						cublasDdot (handle, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
@@ -1387,6 +1394,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 					}
 				}
 				ls /= double(ndegI);
+				if (intensity.reduced && ndegF!=1 && ndegI != 1) ls  *= double(ndegI);
 				double final_ls = ls;
 				double nu_if = energyF - energyI; 
              			boltz_fc = abs(nu_if) * exp(-(energyI-intensity.ZPE) * beta) * (1.0 - exp(-abs(nu_if) * beta))/ intensity.q_stat;
