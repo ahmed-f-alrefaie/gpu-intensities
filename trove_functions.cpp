@@ -1092,9 +1092,18 @@ void read_eigenvalues(FintensityJob & job){
 	int maxj = 0;
 	int iroot = 0;
 	maxdeg = 0;
-	
+	int* ilevel_new;
+	//int ilevel_new(njval,sym%Nrepresen,nroots_t)
+
 	for(int i = 0; i < 2; i++)
 		maxj = max(maxj,job.jvals[i]);
+
+
+	for(int i= 0; i < 2; i++)
+		nroots_t = max(job.bset_contr[i].Maxcontracts,nroots_t);
+
+	ilevel_new = new int[2*job.molec.sym_nrepres*nroots_t];	
+
 
 	int (*ktau_rot)[2] = new int[1 + (2*maxj)][2];
 	for(int i = 0; i < 2; i++)
@@ -1153,14 +1162,18 @@ void read_eigenvalues(FintensityJob & job){
 					printf("Gammas dont match what the fuck bro\n");
 					exit(0);
 				}
-				strtol(line_ptr,&line_ptr,0);
+				ilevel = strtol(line_ptr,&line_ptr,0)-1;
 				ideg=strtol(line_ptr,&line_ptr,0); //ideg
 				//Get the energy
 				energy = strtod(line_ptr,&line_ptr);
 				//if (job%ZPE<0.and.igamma==1.and.Jval(jind)==0) job%zpe = energy
 				if(job.ZPE < 0 && igamma==1 && jVal==0) job.ZPE = energy;
 				if(filter(job,energy,gamma)){
-					if(ideg==1) nlevels++;
+					if(ideg==1) {
+						
+						ilevel_new[i + gamma*2 + ilevel*job.molec.sym_nrepres*2] = nlevels;
+						nlevels++;
+					}
 					nroots += job.molec.sym_degen[gamma];
 					maxdeg = max(maxdeg,(job.molec.sym_degen[gamma]));
 
@@ -1179,11 +1192,12 @@ void read_eigenvalues(FintensityJob & job){
 	job.Neigenlevels = nlevels;
 	job.Neigenroots = nroots;
 	//Otherwise allocate
-	job.eigen = new TO_PTeigen[nlevels];
+	job.eigen = new TO_PTeigen[job.Neigenlevels];
 	if(job.eigen == NULL){
 		printf("Allocation error: job.eigen\n");
 		exit(0);
 	}
+	printf("Neigenvlause = %i\n",nlevels);
 /*
 	    do ilevel = 1,Neigenlevels
       !
@@ -1207,7 +1221,9 @@ void read_eigenvalues(FintensityJob & job){
 		job.eigen[i].quanta = new int[job.molec.nmodes+1];
 		job.eigen[i].normal = new int[job.molec.nmodes+1];	
 		job.eigen[i].cgamma = new char*[job.molec.nclasses+1];
+		job.eigen[i].igamma     = 0;
 		job.eigen[i].ndeg = 0;
+		//job.eigen[i].energy=99999999.9;
 	}
 
 	/*
@@ -1233,9 +1249,10 @@ void read_eigenvalues(FintensityJob & job){
        enddo
 */	
 	nlevels = 0;
+	nroots = 0;
 	for(int jind = 0; jind < 2; jind++)
 	{
-		ktau_rot[0][0] = 1;
+		ktau_rot[0][0] = 0;
 		ktau_rot[0][1] = job.jvals[jind] % 2;       
 	//ktau_rot(0,1) = 0
         //ktau_rot(0,2) = mod(Jval(jind),2)
@@ -1249,6 +1266,7 @@ void read_eigenvalues(FintensityJob & job){
 			   iroot = iroot + 1;
 			   ktau_rot[iroot][0] = k0;
 			   ktau_rot[iroot][1] = tau0;
+			   
 			}
 		}
 
@@ -1305,24 +1323,24 @@ void read_eigenvalues(FintensityJob & job){
 					printf("Gammas dont match what the fuck bro\n");
 					exit(0);
 				}
-				ilevel = strtol(line_ptr,&line_ptr,0); //ilevel
+				ilevel = strtol(line_ptr,&line_ptr,0)-1; //ilevel
 				ideg=strtol(line_ptr,&line_ptr,0); //ideg
 				//Get the energy
 				energy = strtod(line_ptr,&line_ptr);
 				//if (job%ZPE<0.and.igamma==1.and.Jval(jind)==0) job%zpe = energy
 				if(filter(job,energy,gamma)){
 					//okay it passed right?
+					nlevels = ilevel_new[jind + gamma*2 + ilevel*job.molec.sym_nrepres*2];
 					job.eigen[nlevels].irec[ideg-1]  = irec;
 					if(ideg==1) {
 						//Assign
-						job.eigen[nlevels].ndeg  = job.molec.sym_degen[gamma];
-						//printf("igamma = %i",gamma);
+						
 						job.eigen[nlevels].jind       = jind;
 						job.eigen[nlevels].jval       = jVal;
 						job.eigen[nlevels].ilevel     = ilevel;
-
 						job.eigen[nlevels].energy     = energy;
 						job.eigen[nlevels].igamma     = gamma;
+						//printf("ilevel = %i nlevels=%i nroots=%i gamma=%i indI=%i\n",ilevel,nlevels, nroots,job.eigen[nlevels].igamma,job.eigen[nlevels].jind);
 						for(int q = 0; q < job.molec.nmodes+1; q++)
 							job.eigen[nlevels].quanta[q]  = strtol(line_ptr,&line_ptr,0);
 						strtol(line_ptr,&line_ptr,0); //large_coef part
@@ -1337,8 +1355,12 @@ void read_eigenvalues(FintensityJob & job){
 
 						job.eigen[nlevels].krot       = ktau_rot[job.eigen[nlevels].quanta[0]][0];
 						job.eigen[nlevels].taurot     = ktau_rot[job.eigen[nlevels].quanta[0]][1];
-						nlevels++;
+					
 					}
+
+
+					nroots += job.molec.sym_degen[gamma];
+					job.eigen[nlevels].ndeg  = job.molec.sym_degen[gamma];
 				}
 
 
@@ -1355,10 +1377,10 @@ void read_eigenvalues(FintensityJob & job){
 		
 	}
 
-
+	printf("nlevels=%i\n",nlevels);
 	//Sort the energies
 	//Sort the energies
-	qsort(job.eigen,job.Neigenlevels,sizeof(TO_PTeigen),sort_pteigen_func);
+	qsort(job.eigen,nlevels,sizeof(TO_PTeigen),sort_pteigen_func);
 	//Print them out if debug
 
 	//
@@ -1369,6 +1391,7 @@ void read_eigenvalues(FintensityJob & job){
 	#endif	
 	
 	delete[] ktau_rot;
+	delete[] ilevel_new;
 
 	
 	
