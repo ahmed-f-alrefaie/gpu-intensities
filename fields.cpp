@@ -97,9 +97,9 @@ void read_symmetry(const char* symchar, FintensityJob* intensity){
 		intensity->molec.c_sym = new char*[6];
 		for(int i = 0; i < 6; i++)
 			intensity->molec.c_sym[i] = new char[10];
-		strcpy(intensity->molec.c_sym[0],"A1");
-		strcpy(intensity->molec.c_sym[1],"A2");
-		strcpy(intensity->molec.c_sym[2],"E");
+		strcpy(intensity->molec.c_sym[0],"A1\'");
+		strcpy(intensity->molec.c_sym[1],"A2\'");
+		strcpy(intensity->molec.c_sym[2],"E\'");
 		strcpy(intensity->molec.c_sym[3],"A1\"");
 		strcpy(intensity->molec.c_sym[4],"A2\"");
 		strcpy(intensity->molec.c_sym[5],"E\"");

@@ -515,8 +515,8 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
 			#endif	
         		
 
-             		bset_contr->icontr2icase[icontr]      = icase;
-             		bset_contr->icontr2icase[icontr + ncontr]      = ilambda;
+             		bset_contr->icontr2icase[icontr + 0*ncontr]      = icase;
+             		bset_contr->icontr2icase[icontr + 1*ncontr]      = ilambda;
         		#ifndef NDEBUG
 				printf("icontr = %i icase = %i ilambda = %i \n", icontr,icase,ilambda);
 			#endif	
@@ -533,7 +533,14 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
         	}
         	  
        }
-       
+	//if(jval==1){printf("icontr2icase[:,2]\n");     
+	//for(int i = 0; i < ncontr; i++)
+	//	printf("%i\n",bset_contr->icontr2icase[i + 1*ncontr]);
+
+	//exit(0);
+		
+	//}
+
 	if (icontr != ncontr)
 	{
 		fprintf(stderr,"[bset_contr_factory] wrong indexing\n");
@@ -584,16 +591,27 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
 	bset_contr->irr = new TO_PTrepresT[sym_nrepres];
 	bset_contr->Ntotal = new int[sym_nrepres];
 	getline(eig_qu,line);
+
 	mat_size = strtol(line.c_str(),&line_ptr,0);
+
+	printf("matsize = %i\n",mat_size);
+
 	//cout<<line<<endl;
 	bset_contr->mat_size = mat_size;
+
 	//read(iounit,*) Ntotal(1:sym%Nrepresen)
 	getline(eig_qu,line);
+
 	bset_contr->Ntotal[0] = strtol(line.c_str(),&line_ptr,0); 
+
+	printf("Ntotal[0]=%i\n",bset_contr->Ntotal[0]);
+
 	//cout<<line<<endl;
-	for(int i = 1; i < sym_nrepres; i++)
+	for(int i = 1; i < sym_nrepres; i++){
+
 		bset_contr->Ntotal[i] = strtol(line_ptr,&line_ptr,0);
-	
+		printf("Ntotal[%i]=%i\n",i,bset_contr->Ntotal[i]);
+	}
 	//(bset_contr(jind)%irr(igamma)%N(bset_contr(jind)%Maxsymcoeffs),bset_contr(jind)%irr(igamma)%repres(Ntotal(igamma),sym%degen(igamma),mat_size)
 	//printf("nrepres = %i",sym_nrepres);
 	for(int igamma = 0; igamma < sym_nrepres; igamma++)
@@ -623,24 +641,29 @@ void bset_contr_factory(TO_bset_contrT* bset_contr,uint jval,int* sym_degen,int 
               //		enddo
               //		!
               //	enddo
+	//	printf("irred-part\n");
               for(int icoeff = 0; icoeff <  bset_contr->Ntotal[igamma]; icoeff++)
               {
               		for(int ideg =0; ideg <  sym_degen[igamma]; ideg++)
               		{
               			getline(eig_qu,line);	
 				//cout<<line<<endl;
-              			//bset_contr->irr[igamma].repres[icoeff + ideg*bset_contr->Ntotal[igamma]] = strtol(line.c_str(),&line_ptr,0);
-              			for(int i = 0; i < mat_size; i++){
-					bset_contr->irr[igamma].repres[icoeff + ideg*bset_contr->Ntotal[igamma] + i*bset_contr->Ntotal[igamma]*sym_degen[igamma]] = strtod(line.c_str(),&line_ptr);
+              			bset_contr->irr[igamma].repres[icoeff + ideg*bset_contr->Ntotal[igamma]] = strtod(line.c_str(),&line_ptr);
+				#ifndef NDEBUG
+					printf("irr[%i].repres[%i,%i,%i]=%11.4e\n",igamma,icoeff,ideg,0,bset_contr->irr[igamma].repres[icoeff + ideg*bset_contr->Ntotal[igamma] + 0*bset_contr->Ntotal[igamma]*sym_degen[igamma]]);
+				#endif
+              			for(int i = 1; i < mat_size; i++){
+					bset_contr->irr[igamma].repres[icoeff + ideg*bset_contr->Ntotal[igamma] + i*bset_contr->Ntotal[igamma]*sym_degen[igamma]] = strtod(line_ptr,&line_ptr);
 					#ifndef NDEBUG
 						printf("irr[%i].repres[%i,%i,%i]=%11.4e\n",igamma,icoeff,ideg,i,bset_contr->irr[igamma].repres[icoeff + ideg*bset_contr->Ntotal[igamma] + i*bset_contr->Ntotal[igamma]*sym_degen[igamma]]);
 					#endif
 				}
 			}
 	      }
+
+		
 			
 	}
-	
 	getline(eig_qu,line);
 	
 	if(trim(line).compare("End irreducible transformation")!=0)
@@ -684,8 +707,8 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 	//allocate(cnu_i(1:nclasses),cnu_j(1:nclasses),stat = info)
 	cnu_i = new int[nclasses];
 	cnu_j = new int[nclasses];
-	printf("Maxsymj0 = %i %i %i\n",bset_contrj0.Maxcontracts,bset_contrj0.Maxsymcoeffs,	bset_contrj0.max_deg_size);
-	printf("Maxsym = %i %i %i\n",bset_contr.Maxcontracts,bset_contr.Maxsymcoeffs,bset_contr.max_deg_size);
+	printf("Maxsymj0 = %i %i %i \n",bset_contrj0.Maxcontracts,bset_contrj0.Maxsymcoeffs,	bset_contrj0.max_deg_size);
+	printf("Maxsym = %i %i %i \n",bset_contr.Maxcontracts,bset_contr.Maxsymcoeffs,bset_contr.max_deg_size);
 
 	//allocate(bset_contr(jind)%icontr_correlat_j0(bset_contr(jind)%Maxsymcoeffs,bset_contr(jind)%max_deg_size), stat = info)
 	bset_contr.icontr_correlat_j0 = new int[bset_contr.Maxsymcoeffs*bset_contr.max_deg_size];
@@ -698,7 +721,9 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 	{	
  		//printf("icase=%i\n",icase);
 		//cnu_i(1:nclasses) = bset_contr(jind)%contractive_space(1:nclasses, icase)
-		memcpy(cnu_i,bset_contr.contractive_space + icase*(nclasses+1) + 1,sizeof(int)*nclasses);
+		for(int c_i = 0; c_i < nclasses; c_i++)
+			cnu_i[c_i] = bset_contr.contractive_space[(c_i+1) + icase*(nclasses+1)];
+		//memcpy(cnu_i,bset_contr.contractive_space + icase*(nclasses+1) + 1,sizeof(int)*nclasses);
 		//do ilambda = 1, bset_contr(jind)%index_deg(icase)%size1
 		for(ilambda = 0; ilambda < bset_contr.index_deg[icase].size1; ilambda++)
 		{
@@ -708,8 +733,9 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 			for(jcase = 0; jcase < bset_contrj0.Maxsymcoeffs; jcase++)
 			{
 				//cnu_j(1:nclasses) = bset_contr(1)%contractive_space(1:nclasses, jcase)
-
-				memcpy(cnu_j,bset_contrj0.contractive_space + (1 + jcase*(nclasses+1)),sizeof(int)*nclasses);
+				for(int c_j = 0; c_j < nclasses; c_j++)
+					cnu_j[c_j] = bset_contrj0.contractive_space[(c_j+1) + jcase*(nclasses+1)];
+				//memcpy(cnu_j,bset_contrj0.contractive_space + (1 + jcase*(nclasses+1)),sizeof(int)*nclasses);
 				//do jlambda = 1, bset_contr(1)%index_deg(jcase)%size1
 				for(jlambda = 0; jlambda < bset_contrj0.index_deg[jcase].size1; jlambda++)
 				{
@@ -722,7 +748,12 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
                 			         !
                  					endif
                					  */  
-
+					//for(int i = 0; i < nclasses; i++)
+					//	printf(" %i ",cnu_i[i]);
+					//printf("\t|\t");
+					//for(int i = 0; i < nclasses; i++)
+					//	printf(" %i ",cnu_j[i]);
+					//printf("\n");					
 					if(memcmp(cnu_i,cnu_j,sizeof(int)*nclasses)==0 && memcmp(bset_contrj0.index_deg[jcase].icoeffs + jlambda*(nclasses+1) + 1,
 												 bset_contr.index_deg[icase].icoeffs + ilambda*(nclasses+1) + 1,
 												 sizeof(int)*nclasses)==0)
@@ -797,10 +828,10 @@ void correlate_index(TO_bset_contrT & bset_contrj0, TO_bset_contrT & bset_contr)
 		bset_contr.iroot_correlat_j0[iroot] = jcontr;
 		//if(bset_contr.jval==23&&iroot > 14346) printf("done\n");
 
-		ilevel  = bset_contr.contractive_space[icase*(nclasses+1)];
+		ilevel  = bset_contr.contractive_space[0 + icase*(nclasses+1)];
 		//if(bset_contr.jval==23&&iroot > 14346) printf("ilevel = %i\n",ilevel);
-		ideg    = bset_contr.index_deg[icase].icoeffs[(nclasses+1)*ilambda];
-		//if(bset_contr.jval==23&&iroot > 14346) printf("ideg = %i\n",ideg);
+		ideg    = bset_contr.index_deg[icase].icoeffs[0 + (nclasses+1)*ilambda];
+		//printf("ideg = %i\n",ideg);
 		//if(bset_contr.jval==23&&iroot > 14346) printf("rot parts\n");
 		k      = bset_contr.rot_index[ilevel+ideg*ncases].k;
 		//if(bset_contr.jval==23&&iroot > 14346) printf("k = %i\n",k);

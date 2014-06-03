@@ -915,7 +915,7 @@ __host__ void dipole_initialise_gpu(FintensityJob * intensity, FGPU_ptrs & g_ptr
 	int_gpu.dip_stride_2 = intensity->bset_contr[0].Maxcontracts*intensity->bset_contr[0].Maxcontracts;
 	int_gpu.dimenmax = intensity->dimenmax;
 	int_gpu.sq2 = 1.0/sqrt(2.0);
-
+	printf("Sym max_degen = %i\n",intensity->molec.sym_maxdegen);
 	copy_array_to_gpu((void*)intensity->molec.sym_degen,(void**)&int_gpu.sym_degen,sizeof(int)*intensity->molec.sym_nrepres,"sym_degen");
 	g_ptrs.avail_mem -= sizeof(int)*intensity->molec.sym_nrepres;
 
@@ -1311,6 +1311,7 @@ __host__ void dipole_do_intensities_async_omp(FintensityJob & intensity,int devi
 						device_correlate_vectors<<<gridSize,blockSize,0,st_ddot_vectors[stream_count]>>>(g_ptrs.bset_contr[indF],idegF,igammaF, (gpu_final_vectors + i*intensity.nsizemax),gpu_corr_vectors + intensity.dimenmax*i);
 						cublasSetStream(handle,st_ddot_vectors[stream_count]);
 						cublasDdot (handle, dimenF,gpu_corr_vectors + intensity.dimenmax*i, 1, gpu_half_ls + indF*intensity.dimenmax + idegI*intensity.dimenmax*nJ, 1, 
+
 														&line_str[i + idegI*no_final_states_gpu + idegF*no_final_states_gpu*intensity.molec.sym_maxdegen]);
 
 					}
